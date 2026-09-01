@@ -1,0 +1,19 @@
+*.iml
+.gradle
+/local.properties
+/.idea/
+.kotlin/
+.DS_Store
+/build
+app/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# 설계 문서·규약·참고 이미지 — 로컬 전용 (저장소에 커밋 안 함)
+/docs
+
+# JVM crash / replay logs
+replay_pid*.log
+hs_err_pid*.log
