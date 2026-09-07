@@ -11,13 +11,13 @@ import androidx.compose.ui.unit.sp
 
 /**
  * Mark7 컨트롤러는 기존 만드로 앱들과 뚜렷이 다른 톤을 목표로 한다: 계측 장비
- * 느낌의 차분한 그래파이트 + 청록 액센트, 상태색(온도/전류 경고)은 의미 기반.
+ * 느낌의 차분한 그래파이트 + 진한 파랑 액센트 하나, 상태색(온도/전류 경고)은 의미 기반.
  * (구체 UI 방향은 화면 작업 때 확정 — 여기서는 토큰만.)
  */
 object Mark7Palette {
-    val Accent = Color(0xFF17B0A7)      // 청록
-    val AccentDim = Color(0xFF0E6F6A)
-    val AccentSoft = Color(0xFFDDF4F2)
+    val Accent = Color(0xFF2B5CA8)      // 진한 파랑 (앱 유일 강조색)
+    val AccentDim = Color(0xFF1D437E)
+    val AccentSoft = Color(0xFFE4ECF7)
 
     val Ink = Color(0xFF11161B)
     val InkMuted = Color(0xFF5B6670)
@@ -30,10 +30,18 @@ object Mark7Palette {
     val Danger = Color(0xFFDB4B4B)      // 과열 / 과전류
     val Ok = Color(0xFF2FA36B)
 
-    // 모터 6개 색 (모니터링 그래프용)
+    // 동작 제어 (쥐기 / 펴기) 전용 고대비 의미 색상
+    val Grasp = Color(0xFF1E56A0)         // 쥐기 (선명한 코발트 블루)
+    val GraspSoft = Color(0xFFE8F1FC)     // 쥐기 연한 배경
+    val GraspBorder = Color(0xFF3B82F6)   // 쥐기 활성 강조 테두리
+    val Release = Color(0xFF0D824D)       // 펴기 (산뜻한 에메랄드 그린)
+    val ReleaseSoft = Color(0xFFE6F5EC)   // 펴기 연한 배경
+    val ReleaseBorder = Color(0xFF10B981) // 펴기 활성 강조 테두리
+
+    // 모터 6개 트레이스 색 — 구분은 뚜렷하되 형광·청록 없는 팔레트.
     val motorColors = listOf(
-        Color(0xFFE0533B), Color(0xFFE08B2E), Color(0xFF3FA34D),
-        Color(0xFF2E9BD6), Color(0xFF5A5FD0), Color(0xFFB255C8),
+        Color(0xFF3060A8), Color(0xFFDE8F05), Color(0xFF6E8B3D),
+        Color(0xFFD55E00), Color(0xFFA25CA0), Color(0xFF8C6D4F),
     )
 }
 
@@ -48,6 +56,14 @@ private val LightScheme = lightColorScheme(
     onSurface = Mark7Palette.Ink,
     surfaceVariant = Mark7Palette.SurfaceAlt,
     onSurfaceVariant = Mark7Palette.InkMuted,
+    surfaceTint = Color.Transparent,
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Mark7Palette.SurfaceAlt,
+    surfaceContainer = Mark7Palette.Surface,
+    surfaceContainerHigh = Mark7Palette.Surface,
+    surfaceContainerHighest = Mark7Palette.SurfaceAlt,
+    surfaceBright = Color.White,
+    surfaceDim = Mark7Palette.SurfaceAlt,
     error = Mark7Palette.Danger,
     outline = Mark7Palette.Line,
 )
