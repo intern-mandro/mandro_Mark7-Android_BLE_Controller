@@ -1,10 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  mandro 런처 아이콘 배경 — 딥블루 그라디언트 (콘셉트 C-color, 2026-09-02).
+  좌상 #123E74 → 우하 #0A1F3D 대각. 화이트 라인아트 전경을 받쳐주는 어두운 배경.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#1478F5"
-        android:pathData="M0,0h108v108h-108z" />
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="4"
+                android:startY="0"
+                android:endX="104"
+                android:endY="108"
+                android:startColor="#123E74"
+                android:centerColor="#0E2D55"
+                android:endColor="#0A1F3D" />
+        </aapt:attr>
+    </path>
 </vector>
