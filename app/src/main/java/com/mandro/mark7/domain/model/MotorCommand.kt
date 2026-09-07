@@ -1,6 +1,9 @@
 package com.mandro.mark7.domain.model
 
+import kotlinx.serialization.Serializable
+
 /** CMD 프레임 dir 필드 (`config.h::CmdDir`). */
+@Serializable
 enum class CmdDir(val wire: Int) {
     STOP(0),
     GRASP(1),
