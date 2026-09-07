@@ -27,7 +27,8 @@ android {
             buildConfigField("Boolean", "USE_MOCK_BLE", "false")
         }
         debug {
-            buildConfigField("Boolean", "USE_MOCK_BLE", "false")
+            // 실기기 없이 "연결된 상태"로 앱을 돌린다 (FakeHandRepository 바인딩).
+            buildConfigField("Boolean", "USE_MOCK_BLE", "true")
         }
     }
 

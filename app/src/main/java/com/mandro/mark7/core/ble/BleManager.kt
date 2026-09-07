@@ -16,12 +16,14 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.mandro.mark7.R
 import com.mandro.mark7.domain.model.BleDevice
 import com.mandro.mark7.domain.model.BleState
 import com.mandro.mark7.domain.model.HandStatus
 import com.mandro.mark7.domain.model.MARK7_NAME_PREFIX
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -36,6 +38,10 @@ private const val TAG = "Mark7Ble"
 private val SERVICE_UUID = UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb")
 private val CHAR_UUID = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb")
 private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+
+/** HM-10 UART 버퍼 오버플로우 방지 및 기본 BLE MTU(23B) 안전 송신 청크 단위 */
+private const val TX_CHUNK_SIZE = 12
+private const val TX_CHUNK_INTERVAL_MS = 20L
 
 /**
  * 의수 BLE 저수준 관리자. 스캔 / 연결 / 프레임 송수신만 한다.
@@ -61,17 +67,20 @@ class BleManager @Inject constructor(
     private var writeChar: BluetoothGattCharacteristic? = null
     private var connectingDevice: BleDevice? = null
 
+    /** 기본적으로 의수 관련 기기만 필터링하되, 필요 시 전체 기기를 볼 수 있도록 지원 */
+    var filterHandsOnly: Boolean = true
+
     /** 마지막으로 보낸 SET 의 "SETok" 응답을 기다리는 쪽에 신호. */
     @Volatile
     private var pendingAck: CompletableDeferred<Unit>? = null
 
     // ── 권한 ──────────────────────────────────────────────────
-    private fun hasScan(): Boolean =
+    fun hasScan(): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             granted(Manifest.permission.BLUETOOTH_SCAN)
         else granted(Manifest.permission.ACCESS_FINE_LOCATION)
 
-    private fun hasConnect(): Boolean =
+    fun hasConnect(): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             granted(Manifest.permission.BLUETOOTH_CONNECT)
         else true
@@ -84,7 +93,7 @@ class BleManager @Inject constructor(
     fun startScan() {
         val scanner = adapter?.bluetoothLeScanner
         if (scanner == null || !hasScan()) {
-            _state.value = BleState.Error("블루투스가 꺼져 있거나 스캔 권한이 없습니다.")
+            _state.value = BleState.Error(context.getString(R.string.ble_err_permission_scan))
             return
         }
         found.clear()
@@ -93,7 +102,7 @@ class BleManager @Inject constructor(
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
         runCatching { scanner.startScan(null, settings, scanCallback) }
-            .onFailure { _state.value = BleState.Error("스캔 실패: ${it.message}") }
+            .onFailure { _state.value = BleState.Error(context.getString(R.string.ble_err_scan_failed, it.message ?: "")) }
     }
 
     @SuppressLint("MissingPermission")
@@ -105,15 +114,29 @@ class BleManager @Inject constructor(
     private val scanCallback = object : ScanCallback() {
         @SuppressLint("MissingPermission")
         override fun onScanResult(callbackType: Int, result: ScanResult) {
-            val name = result.device.name ?: return
-            // Mark7 의수는 이름이 'm...' 으로 시작 (hand.py name_prefixes=("m",))
-            if (!name.lowercase().startsWith(MARK7_NAME_PREFIX)) return
-            found[result.device.address] = BleDevice(name, result.device.address, result.rssi)
+            val recordName = result.scanRecord?.deviceName
+            val devName = result.device.name
+            val name = recordName ?: devName
+
+            val hasHandService = result.scanRecord?.serviceUuids?.any {
+                it.uuid.toString().equals(SERVICE_UUID.toString(), ignoreCase = true)
+            } == true
+
+            val isKnownPrefix = name?.lowercase()?.let { lower ->
+                lower.startsWith(MARK7_NAME_PREFIX) || lower.startsWith("bt") || lower.startsWith("hm") || lower.startsWith("mark")
+            } == true
+
+            if (filterHandsOnly && !hasHandService && !isKnownPrefix) {
+                return
+            }
+
+            val displayName = name ?: "Mark7 Device (${result.device.address.takeLast(5)})"
+            found[result.device.address] = BleDevice(displayName, result.device.address, result.rssi)
             _state.value = BleState.DevicesFound(found.values.toList())
         }
 
         override fun onScanFailed(errorCode: Int) {
-            _state.value = BleState.Error("스캔 실패 (code $errorCode)")
+            _state.value = BleState.Error(context.getString(R.string.ble_err_scan_code, errorCode))
         }
     }
 
@@ -121,7 +144,7 @@ class BleManager @Inject constructor(
     @SuppressLint("MissingPermission")
     fun connect(device: BleDevice) {
         if (!hasConnect()) {
-            _state.value = BleState.Error("연결 권한이 없습니다.")
+            _state.value = BleState.Error(context.getString(R.string.ble_err_permission_connect))
             return
         }
         stopScan()
@@ -148,20 +171,42 @@ class BleManager @Inject constructor(
         }
     }
 
-    // ── 송신 ──────────────────────────────────────────────────
+    // ── 송신 (MTU 안전 청킹 분할 전송) ─────────────────────────────
     @SuppressLint("MissingPermission")
-    fun writeFrame(bytes: ByteArray): Boolean {
+    suspend fun writeFrame(bytes: ByteArray): Boolean {
         val g = gatt ?: return false
         val ch = writeChar ?: return false
         Log.d(TAG, "TX >> ${bytes.joinToString(" ") { "%02X".format(it) }}")
         val type = if (ch.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0)
             BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
         else BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+
+        if (bytes.size <= TX_CHUNK_SIZE) {
+            return writeChunk(g, ch, bytes, type)
+        }
+
+        for (offset in bytes.indices step TX_CHUNK_SIZE) {
+            val end = (offset + TX_CHUNK_SIZE).coerceAtMost(bytes.size)
+            val chunk = bytes.copyOfRange(offset, end)
+            val ok = writeChunk(g, ch, chunk, type)
+            if (!ok) return false
+            delay(TX_CHUNK_INTERVAL_MS)
+        }
+        return true
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun writeChunk(
+        g: BluetoothGatt,
+        ch: BluetoothGattCharacteristic,
+        chunk: ByteArray,
+        type: Int,
+    ): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            g.writeCharacteristic(ch, bytes, type) == BluetoothGatt.GATT_SUCCESS
+            g.writeCharacteristic(ch, chunk, type) == BluetoothGatt.GATT_SUCCESS
         } else {
             @Suppress("DEPRECATION")
-            ch.value = bytes
+            ch.value = chunk
             @Suppress("DEPRECATION")
             ch.writeType = type
             @Suppress("DEPRECATION")
@@ -186,12 +231,12 @@ class BleManager @Inject constructor(
         @SuppressLint("MissingPermission")
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
             if (status != BluetoothGatt.GATT_SUCCESS) {
-                _state.value = BleState.Error("서비스 탐색 실패 ($status)")
+                _state.value = BleState.Error(context.getString(R.string.ble_err_service_failed, status))
                 return
             }
             val ch = g.getService(SERVICE_UUID)?.getCharacteristic(CHAR_UUID)
             if (ch == null) {
-                _state.value = BleState.Error("Mark7 시리얼 characteristic 을 찾지 못했습니다.")
+                _state.value = BleState.Error(context.getString(R.string.ble_err_char_not_found))
                 return
             }
             writeChar = ch

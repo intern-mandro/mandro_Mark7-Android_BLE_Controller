@@ -35,6 +35,9 @@ object MarkSevenProtocol {
     const val CMD_SIZE = 12
     const val SET_SIZE = 117
     const val STATUS_SIZE = 36
+
+    /** STATUS byte34 하위 니블 = 현재 상태 인덱스(MSS0..MSS8). */
+    const val STATE_INDEX_MAX = 8
     val ACK_SET = byteArrayOf(0x53, 0x45, 0x54, 0x6F, 0x6B) // "SETok"
 
     /** 펌웨어 `ble.cpp` 값 역산 상수. */
@@ -49,14 +52,21 @@ object MarkSevenProtocol {
 
     // ──────────────────────────────────────────────────────────────
     // 전송: CMD (직접 손가락 구동)
-    // ──────────────────────────────────────────────────────────────
+    /**
+     * 펌웨어 `ble.cpp:67`는 pos = (-21 + byte * 2)로 역산한다.
+     * byte가 0이면 pos는 -21이 되고, 펌웨어 `serial.cpp`에서 uint8_t 오버플로우(235)가
+     * 발생하여 RELEASE(펴기) 동작 시 `STOP BY POS3` 조건에 즉시 걸려 모터가 멈추는 치명적 버그가 발생한다.
+     * 따라서 `send_cmd.py` 및 `exo_armband_hybrid.ino` 표준 프리셋과 동일하게
+     * 선택된 손가락의 기본 위치 바이트는 0x90 (144 -> 펌웨어 위치 267)을 사용한다.
+     */
+    const val DEFAULT_CMD_POS_BYTE = 0x90
 
     /**
-     * @param select   길이 6 BooleanArray. index 0 = F1(엄지) … 5 = F6(엄지외전).
+     * @param select    길이 6 BooleanArray. index 0 = F1(엄지) … 5 = F6(엄지외전).
      *                  펌웨어가 bit i → motor(DOF-1-i)로 되돌리므로 여기서 뒤집어 담는다.
      * @param speedRaw  0 이면 "속도 미지정". 아니면 실제 rpm 대략값 → byte = raw / 200 (0..255).
      * @param currentMa 0 이면 "전류 미지정". 아니면 mA → byte = (mA - 600) / 3.
-     * @param posDeg    길이 6. 펌웨어 환산 pos = byte*2 - 21 → byte = ((pos + 21) / 2). 0 이면 0.
+     * @param posDeg    길이 6. 펌웨어 환산 pos = byte*2 - 21 → byte = ((pos + 21) / 2). 0 이면 DEFAULT_CMD_POS_BYTE(0x90).
      * @param dir       STOP / GRASP / RELEASE / RESET_COUNTER / RESET_POWER
      */
     fun buildCmd(
@@ -79,8 +89,14 @@ object MarkSevenProtocol {
         buf[1] = sel.toByte()
         buf[2] = if (speedRaw <= 0) 0 else (speedRaw / SPD_STEP).coerceIn(0, 255).toByte()
         buf[3] = if (currentMa <= 0) 0 else ((currentMa - CUR_BASE) / CUR_STEP).coerceIn(0, 255).toByte()
+        val isMotion = dir == CmdDir.GRASP || dir == CmdDir.RELEASE
         for (i in 0 until DOF) {
-            val b = if (posDeg[i] == 0) 0 else ((posDeg[i] - POS_BASE) / POS_STEP).coerceIn(0, 255)
+            val b = when {
+                !select[i] -> 0
+                !isMotion -> 0
+                posDeg[i] > 0 -> ((posDeg[i] - POS_BASE) / POS_STEP).coerceIn(0, 255)
+                else -> DEFAULT_CMD_POS_BYTE
+            }
             buf[4 + i] = b.toByte()
         }
         buf[10] = dir.wire.toByte()
@@ -145,6 +161,11 @@ object MarkSevenProtocol {
         val currentAvg = IntArray(DOF) { i -> beU16(data, 6 + i * 2) }
         val turn = IntArray(DOF) { i -> beS16(data, 18 + i * 2) }
         val emg = IntArray(EMG_CH) { i -> beU16(data, 30 + i * 2) }
+        // TODO(protocol): byte34 = [상위 니블] program_mode(0→M1,1→M2) + [하위 니블] 현재 MSS.
+        //  실기기로 확인 필요.
+        val raw34 = data[34].u()
+        val state = (raw34 and 0x0F).takeIf { it in 0..STATE_INDEX_MAX }
+        val mode = ((raw34 shr 4) and 0x0F).let { if (it in 0..1) it + 1 else null }
 
         val checksumOk = xor(data, 0, STATUS_SIZE - 1) == data[STATUS_SIZE - 1]
         return HandStatus(
@@ -152,6 +173,8 @@ object MarkSevenProtocol {
             motorCurrentAvg = currentAvg,
             motorTurn = turn,
             emg = emg,
+            currentState = state,
+            programMode = mode,
             checksumOk = checksumOk,
         )
     }
