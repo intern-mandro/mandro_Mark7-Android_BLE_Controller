@@ -234,7 +234,7 @@
     <string name="settings_grasp_current">쥐기 전류</string>
     <string name="settings_max_current">최대 전류</string>
     <string name="settings_range">가동 범위 (펴기→쥐기)</string>
-    <string name="settings_speed">모터 속도 (자유도별)</string>
+    <string name="settings_speed">모터 속도</string>
     <string name="settings_sl">점진적 힘 증가 (SL)</string>
     <string name="settings_emg_amp0">증폭 CH 1</string>
     <string name="settings_emg_amp1">증폭 CH 2</string>
@@ -274,6 +274,28 @@
     <string name="lang_en">English</string>
     <string name="lang_note">선택하면 앱 화면이 즉시 새로고침됩니다. 폰 전체 언어와는 별개이며, 아직 리소스로 옮기지 않은 문구는 그대로 표시될 수 있습니다.</string>
 
+    <!-- 로봇 의수 버전 선택 (자유도 DOF) -->
+    <string name="dof_setup_title">로봇 의수 버전 선택</string>
+    <string name="dof_setup_sub">사용할 로봇 의수의 자유도(DOF)를 선택해 주세요</string>
+    <string name="dof_current_label">현재 선택된 의수</string>
+    <string name="dof_all_models_label">모든 모델</string>
+    <string name="dof_more_btn">more</string>
+    <string name="dof_close_btn">close</string>
+    <string name="dof_setup_search_hint">로봇 의수 검색</string>
+    <string name="dof_setup_search_empty">일치하는 로봇 의수가 없습니다</string>
+    <string name="dof_setup_continue">%1$d자유도로 계속하기</string>
+    <string name="dof_setup_start">선택한 버전으로 시작하기</string>
+    <string name="dof_current_badge">현재 선택됨</string>
+    <string name="dof_standard_badge">표준 모델</string>
+    <string name="dof_extended_badge">확장 모델</string>
+    <string name="dof_motors_count">%1$d개 모터 구동</string>
+    <string name="dof_5_title">Mark7 (5DOF)</string>
+    <string name="dof_5_desc">F1 엄지 · F2 검지 · F3 중지 · F4 약지 · F5 소지</string>
+    <string name="dof_6_title">Mark7 (6DOF)</string>
+    <string name="dof_6_desc">F1 엄지 · F2 검지 · F3 중지 · F4 약지 · F5 소지 · F6 엄지외전</string>
+    <string name="dof_7_title">Mark7 (7DOF)</string>
+    <string name="dof_7_desc">F1 엄지 · F2 검지 · F3 중지 · F4 약지 · F5 소지 · F6 엄지외전 · F7 손목회전</string>
+
     <!-- 모터 이름 -->
     <string name="motor_f1">F1 엄지</string>
     <string name="motor_f2">F2 검지</string>
@@ -281,12 +303,14 @@
     <string name="motor_f4">F4 약지</string>
     <string name="motor_f5">F5 소지</string>
     <string name="motor_f6">F6 엄지외전</string>
+    <string name="motor_f7">F7 손목회전</string>
     <string name="motor_short_f1">엄지</string>
     <string name="motor_short_f2">검지</string>
     <string name="motor_short_f3">중지</string>
     <string name="motor_short_f4">약지</string>
     <string name="motor_short_f5">소지</string>
     <string name="motor_short_f6">엄지외전</string>
+    <string name="motor_short_f7">손목회전</string>
 
     <!-- 손 모양 이름 (영어 원문 표기 유지) -->
     <string name="gesture_flexion">Flexion</string>

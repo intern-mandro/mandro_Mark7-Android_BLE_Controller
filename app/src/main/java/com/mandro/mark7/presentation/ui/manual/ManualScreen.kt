@@ -117,6 +117,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mandro.mark7.R
 import com.mandro.mark7.domain.model.CmdDir
+import com.mandro.mark7.domain.model.HandDof
 import com.mandro.mark7.domain.model.HandStatus
 import com.mandro.mark7.domain.model.ManualPreset
 import com.mandro.mark7.presentation.components.Mark7Slider
@@ -262,7 +263,7 @@ private fun ManualContent(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
-    val fingerResList = HandStatus.MOTOR_SHORT_RES
+    val fingerResList = ui.dof.motorShortRes
     val count = ui.selectedCount
     val isExecuting = ui.lastCommandedDir != null
 
@@ -367,34 +368,27 @@ private fun ManualContent(
                 }
             },
         ) {
-            // F1 ~ F3
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                for (i in 0..2) {
-                    val on = ui.select.getOrElse(i) { false }
-                    FingerSelectChip(
-                        name = "F${i + 1} " + stringResource(fingerResList[i]),
-                        selected = on,
-                        onClick = { if (!isExecuting) onToggleFinger(i) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+            val dofCount = ui.dof.dof
+            val ranges = when (dofCount) {
+                5 -> listOf(0..2, 3..4)
+                6 -> listOf(0..2, 3..5)
+                7 -> listOf(0..3, 4..6)
+                else -> (0 until dofCount).chunked(3).map { it.first()..it.last() }
             }
-            // F4 ~ F6
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                for (i in 3..5) {
-                    val on = ui.select.getOrElse(i) { false }
-                    FingerSelectChip(
-                        name = "F${i + 1} " + stringResource(fingerResList[i]),
-                        selected = on,
-                        onClick = { if (!isExecuting) onToggleFinger(i) },
-                        modifier = Modifier.weight(1f),
-                    )
+            ranges.forEach { range ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    for (i in range) {
+                        val on = ui.select.getOrElse(i) { false }
+                        FingerSelectChip(
+                            name = "F${i + 1} " + stringResource(fingerResList[i]),
+                            selected = on,
+                            onClick = { if (!isExecuting) onToggleFinger(i) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
 
@@ -753,6 +747,7 @@ private fun ManualContent(
     // ── 새 동작 만들기 다이얼로그 ──
     if (showCreateDialog) {
         CreatePresetDialog(
+            dof = ui.dof,
             onDismiss = { showCreateDialog = false },
             onSave = { name, emoji, imageUri, imgBiasX, imgBiasY, fingers, dir ->
                 onCreatePreset(name, emoji, imageUri, imgBiasX, imgBiasY, fingers, dir)
@@ -764,6 +759,7 @@ private fun ManualContent(
     // ── 동작 수정 / 삭제 다이얼로그 (롱프레스 시) ──
     editingPreset?.let { preset ->
         EditPresetDialog(
+            dof = ui.dof,
             preset = preset,
             displayName = getPresetDisplayName(preset, context),
             onDismiss = { editingPreset = null },
@@ -1352,6 +1348,7 @@ private val RECOMMENDED_PRESET_EMOJIS = listOf(
 /** 새 동작 만들기 모달 다이얼로그 */
 @Composable
 private fun CreatePresetDialog(
+    dof: HandDof = HandDof.DEFAULT,
     onDismiss: () -> Unit,
     onSave: (name: String, emoji: String, imageUri: String?, imageBiasX: Float, imageBiasY: Float, fingers: List<Boolean>, dir: CmdDir) -> Unit,
 ) {
@@ -1362,9 +1359,9 @@ private fun CreatePresetDialog(
     var imgBiasX by remember { mutableStateOf(0f) }
     var imgBiasY by remember { mutableStateOf(0f) }
     var direction by remember { mutableStateOf<CmdDir?>(null) }
-    var fingers by remember { mutableStateOf(List(6) { false }) }
+    var fingers by remember { mutableStateOf(List(dof.dof) { false }) }
     val recommendedEmojis = RECOMMENDED_PRESET_EMOJIS
-    val fingerResList = HandStatus.MOTOR_SHORT_RES
+    val fingerResList: List<Int> = dof.motorShortRes
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1483,36 +1480,32 @@ private fun CreatePresetDialog(
                         style = MaterialTheme.typography.labelMedium,
                         color = Mark7Palette.InkMuted,
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        for (i in 0..2) {
-                            val on = fingers[i]
-                            FingerMiniChip(
-                                label = "F${i + 1} " + stringResource(fingerResList[i]),
-                                selected = on,
-                                onClick = {
-                                    fingers = fingers.toMutableList().apply { this[i] = !this[i] }
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
+                    val dofCount = dof.dof
+                    val ranges = when (dofCount) {
+                        5 -> listOf(0..2, 3..4)
+                        6 -> listOf(0..2, 3..5)
+                        7 -> listOf(0..3, 4..6)
+                        else -> (0 until dofCount).chunked(3).map { it.first()..it.last() }
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        for (i in 3..5) {
-                            val on = fingers[i]
-                            FingerMiniChip(
-                                label = "F${i + 1} " + stringResource(fingerResList[i]),
-                                selected = on,
-                                onClick = {
-                                    fingers = fingers.toMutableList().apply { this[i] = !this[i] }
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
+                    ranges.forEach { range ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            for (i in range) {
+                                val on = fingers.getOrElse(i) { false }
+                                FingerMiniChip(
+                                    label = "F${i + 1} " + stringResource(fingerResList[i]),
+                                    selected = on,
+                                    onClick = {
+                                        val list = fingers.toMutableList()
+                                        while (list.size <= i) list.add(false)
+                                        list[i] = !list[i]
+                                        fingers = list
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
                         }
                     }
                 }
@@ -1539,6 +1532,7 @@ private fun CreatePresetDialog(
 /** 동작 수정 다이얼로그 (롱프레스 시). 삭제는 상단 "삭제" 버튼, 순서 변경은 그리드 드래그. */
 @Composable
 private fun EditPresetDialog(
+    dof: HandDof = HandDof.DEFAULT,
     preset: ManualPreset,
     displayName: String,
     onDismiss: () -> Unit,
@@ -1552,10 +1546,10 @@ private fun EditPresetDialog(
     var imgBiasX by remember { mutableStateOf(preset.imageBiasX) }
     var imgBiasY by remember { mutableStateOf(preset.imageBiasY) }
     var direction by remember { mutableStateOf(preset.direction) }
-    var fingers by remember { mutableStateOf(preset.fingers) }
+    var fingers by remember { mutableStateOf(List(dof.dof) { i -> preset.fingers.getOrElse(i) { false } }) }
     var showResetConfirm by remember { mutableStateOf(false) }
     val recommendedEmojis = RECOMMENDED_PRESET_EMOJIS
-    val fingerResList = HandStatus.MOTOR_SHORT_RES
+    val fingerResList: List<Int> = dof.motorShortRes
 
     if (showResetConfirm) {
         AlertDialog(
@@ -1710,36 +1704,32 @@ private fun EditPresetDialog(
                         style = MaterialTheme.typography.labelMedium,
                         color = Mark7Palette.InkMuted,
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        for (i in 0..2) {
-                            val on = fingers[i]
-                            FingerMiniChip(
-                                label = "F${i + 1} " + stringResource(fingerResList[i]),
-                                selected = on,
-                                onClick = {
-                                    fingers = fingers.toMutableList().apply { this[i] = !this[i] }
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
+                    val dofCount = dof.dof
+                    val ranges = when (dofCount) {
+                        5 -> listOf(0..2, 3..4)
+                        6 -> listOf(0..2, 3..5)
+                        7 -> listOf(0..3, 4..6)
+                        else -> (0 until dofCount).chunked(3).map { it.first()..it.last() }
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        for (i in 3..5) {
-                            val on = fingers[i]
-                            FingerMiniChip(
-                                label = "F${i + 1} " + stringResource(fingerResList[i]),
-                                selected = on,
-                                onClick = {
-                                    fingers = fingers.toMutableList().apply { this[i] = !this[i] }
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
+                    ranges.forEach { range ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            for (i in range) {
+                                val on = fingers.getOrElse(i) { false }
+                                FingerMiniChip(
+                                    label = "F${i + 1} " + stringResource(fingerResList[i]),
+                                    selected = on,
+                                    onClick = {
+                                        val list = fingers.toMutableList()
+                                        while (list.size <= i) list.add(false)
+                                        list[i] = !list[i]
+                                        fingers = list
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
                         }
                     }
                 }

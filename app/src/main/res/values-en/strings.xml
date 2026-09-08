@@ -233,7 +233,7 @@
     <string name="settings_grasp_current">Grasp current</string>
     <string name="settings_max_current">Max current</string>
     <string name="settings_range">Travel range (release→grasp)</string>
-    <string name="settings_speed">Motor speed (per finger)</string>
+    <string name="settings_speed">Motor speed</string>
     <string name="settings_sl">Gradual Force Increase (SL)</string>
     <string name="settings_emg_amp0">Amp CH 1</string>
     <string name="settings_emg_amp1">Amp CH 2</string>
@@ -273,6 +273,28 @@
     <string name="lang_en">English</string>
     <string name="lang_note">The app refreshes right away. This is separate from the phone-wide language, and text not yet moved to resources may still show as-is.</string>
 
+    <!-- Robot Hand Version Selection (DOF) -->
+    <string name="dof_setup_title">Select Robot Hand</string>
+    <string name="dof_setup_sub">Choose the degrees of freedom (DOF) of your robotic hand</string>
+    <string name="dof_current_label">Current Robot Hand</string>
+    <string name="dof_all_models_label">All Models</string>
+    <string name="dof_more_btn">more</string>
+    <string name="dof_close_btn">close</string>
+    <string name="dof_setup_search_hint">Search robot hand</string>
+    <string name="dof_setup_search_empty">No matching robot hand found</string>
+    <string name="dof_setup_continue">Continue with %1$d DOF</string>
+    <string name="dof_setup_start">Get Started</string>
+    <string name="dof_current_badge">Selected</string>
+    <string name="dof_standard_badge">Standard</string>
+    <string name="dof_extended_badge">Extended</string>
+    <string name="dof_motors_count">%1$d motors</string>
+    <string name="dof_5_title">Mark7 (5DOF)</string>
+    <string name="dof_5_desc">F1 Thumb · F2 Index · F3 Middle · F4 Ring · F5 Little</string>
+    <string name="dof_6_title">Mark7 (6DOF)</string>
+    <string name="dof_6_desc">F1 Thumb · F2 Index · F3 Middle · F4 Ring · F5 Little · F6 Thumb Abd.</string>
+    <string name="dof_7_title">Mark7 (7DOF)</string>
+    <string name="dof_7_desc">F1 Thumb · F2 Index · F3 Middle · F4 Ring · F5 Little · F6 Thumb Abd. · F7 Wrist</string>
+
     <!-- Motor names -->
     <string name="motor_f1">F1 Thumb</string>
     <string name="motor_f2">F2 Index</string>
@@ -280,12 +302,14 @@
     <string name="motor_f4">F4 Ring</string>
     <string name="motor_f5">F5 Little</string>
     <string name="motor_f6">F6 Thumb Abd.</string>
+    <string name="motor_f7">F7 Wrist</string>
     <string name="motor_short_f1">Thumb</string>
     <string name="motor_short_f2">Index</string>
     <string name="motor_short_f3">Middle</string>
     <string name="motor_short_f4">Ring</string>
     <string name="motor_short_f5">Little</string>
     <string name="motor_short_f6">Thumb Abd.</string>
+    <string name="motor_short_f7">Wrist</string>
 
     <!-- Hand shape names -->
     <string name="gesture_flexion">Flexion</string>
