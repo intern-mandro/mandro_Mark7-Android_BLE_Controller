@@ -16,12 +16,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import com.mandro.mark7.domain.model.HandDof
+
 data class ManualUiState(
-    val select: List<Boolean> = List(6) { false },
+    val dof: HandDof = HandDof.DEFAULT,
+    val select: List<Boolean> = List(HandDof.DEFAULT.dof) { false },
     val useCustomPower: Boolean = false,
     val speedRaw: Int = 20_000,
     val currentMa: Int = 900,
-    val posDeg: List<Int> = List(6) { 0 },
+    val posDeg: List<Int> = List(HandDof.DEFAULT.dof) { 0 },
     /** 전송 직후 짧게 점등되는 방향 (버튼 플래시용). */
     val lastCommandedDir: CmdDir? = null,
     /** 프리셋 탭으로 "준비"된 방향. 이 값이 있으면 해당 방향 버튼만 활성화되고, 그 버튼을 눌러야 실제 전송된다. */
@@ -47,6 +50,24 @@ class ManualViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
 
     val presets: StateFlow<List<ManualPreset>> = repo.manualPresets
+
+    init {
+        viewModelScope.launch {
+            repo.activeDof.collect { dof ->
+                _uiState.update { current ->
+                    if (current.dof == dof && current.select.size == dof.dof) {
+                        current
+                    } else {
+                        current.copy(
+                            dof = dof,
+                            select = List(dof.dof) { i -> current.select.getOrElse(i) { false } },
+                            posDeg = List(dof.dof) { i -> current.posDeg.getOrElse(i) { 0 } },
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     // 액션 실행 후 손가락 선택·쥐기/펴기 버튼이 함께 점등됐다가 같은 시점에 중립으로 복귀하도록
     // 단일 타이머로 관리한다. 화면에는 별도 펄스 상태를 두지 않는다.
@@ -89,7 +110,12 @@ class ManualViewModel @Inject constructor(
      */
     fun resetTransientState() {
         cancelPulse()
-        _uiState.value = ManualUiState()
+        val dof = repo.activeDof.value
+        _uiState.value = ManualUiState(
+            dof = dof,
+            select = List(dof.dof) { false },
+            posDeg = List(dof.dof) { 0 },
+        )
     }
 
     fun setUseCustomPower(enabled: Boolean) = _uiState.update {

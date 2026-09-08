@@ -6,6 +6,7 @@ import com.mandro.mark7.domain.model.BleState
 import com.mandro.mark7.domain.model.CmdDir
 import com.mandro.mark7.domain.model.ConfigPushState
 import com.mandro.mark7.domain.model.HandConfig
+import com.mandro.mark7.domain.model.HandDof
 import com.mandro.mark7.domain.model.HandStatus
 import com.mandro.mark7.domain.model.ManualPreset
 import com.mandro.mark7.domain.model.MotorCommand
@@ -36,6 +37,7 @@ class ManualViewModelTest {
 
     private class FakeHandRepository : HandRepository {
         val sentCommands = mutableListOf<MotorCommand>()
+        override val activeDof: StateFlow<HandDof> = MutableStateFlow(HandDof.DEFAULT)
         override val bleState: Flow<BleState> = kotlinx.coroutines.flow.emptyFlow()
         override val status: Flow<HandStatus> = kotlinx.coroutines.flow.emptyFlow()
         override val configPushState: Flow<ConfigPushState> = kotlinx.coroutines.flow.emptyFlow()

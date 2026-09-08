@@ -12,7 +12,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import com.mandro.mark7.domain.model.HandDof
+
 data class MonitorUiState(
+    val dof: HandDof = HandDof.DEFAULT,
     val connected: Boolean = false,
     val status: HandStatus? = null,
     /** 최근 STATUS 표본(오래된 것 → 최신). 시계열 그래프용. */
@@ -35,6 +38,9 @@ class MonitorViewModel @Inject constructor(
     private var currentWritePtr = 0
 
     init {
+        viewModelScope.launch {
+            repo.activeDof.collect { d -> _uiState.update { it.copy(dof = d) } }
+        }
         viewModelScope.launch {
             repo.bleState.collect { s -> _uiState.update { it.copy(connected = s is BleState.Connected) } }
         }

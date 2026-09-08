@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -104,9 +105,10 @@ private fun MonitorContent(
 
         // 1. 모터 상태 테이블 (온도 및 전류 수치)
         SectionCard(
-            title = stringResource(R.string.monitor_card_motor_status),
+            title = "${stringResource(R.string.monitor_card_motor_status)} (${ui.dof.dof} DOF)",
         ) {
             MotorStatusTable(
+                dof = ui.dof,
                 temps = status.motorTemp,
                 currents = status.motorCurrentAvg,
             )
@@ -151,12 +153,14 @@ private fun MonitorContent(
     }
 }
 
-/** 6개 모터의 온도와 소비 전류를 정갈하게 정렬한 3열 계측 테이블 */
+/** 모터의 온도와 소비 전류를 정갈하게 정렬한 3열 계측 테이블 */
 @Composable
 private fun MotorStatusTable(
+    dof: com.mandro.mark7.domain.model.HandDof = com.mandro.mark7.domain.model.HandDof.DEFAULT,
     temps: IntArray,
     currents: IntArray,
 ) {
+    val motorResList = dof.motorNameRes
     Column(Modifier.fillMaxWidth()) {
         // 테이블 컬럼 헤더 (모터, 온도, 소비 전류 각 구역 중앙 정렬)
         Row(
@@ -200,11 +204,11 @@ private fun MotorStatusTable(
             thickness = 0.8.dp,
         )
 
-        // 6개 모터 행
-        for (i in 0..5) {
+        // 모터 행 (자유도 개수에 맞게)
+        for (i in 0 until dof.dof) {
             val temp = temps.getOrElse(i) { 0 }
             val current = currents.getOrElse(i) { 0 }
-            val motorName = stringResource(HandStatus.MOTOR_NAME_RES.getOrElse(i) { R.string.motor_f1 })
+            val motorName = stringResource(motorResList.getOrElse(i) { R.string.motor_f1 })
 
             Row(
                 Modifier

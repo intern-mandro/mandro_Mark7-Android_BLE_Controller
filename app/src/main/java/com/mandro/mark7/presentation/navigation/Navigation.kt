@@ -5,7 +5,8 @@ import com.mandro.mark7.R
 
 sealed class Screen(val route: String) {
     data object Splash : Screen("splash")
-    data object UserSetup : Screen("user_setup")   // 첫 실행: 사용자(프로필) 생성
+    data object DofSetup : Screen("dof_setup")     // 첫 실행: 로봇 의수 버전(자유도 5/6/7) 선택
+    data object UserSetup : Screen("dof_setup")   // 레거시 호환 라우트
     data object Scan : Screen("scan")
 
     // 메인 바텀 탭 4개를 담는 HorizontalPager 호스트 (옆으로 밀어서 탭 전환)

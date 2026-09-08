@@ -5,6 +5,7 @@ import com.mandro.mark7.domain.model.BleDevice
 import com.mandro.mark7.domain.model.BleState
 import com.mandro.mark7.domain.model.ConfigPushState
 import com.mandro.mark7.domain.model.HandConfig
+import com.mandro.mark7.domain.model.HandDof
 import com.mandro.mark7.domain.model.HandStatus
 import com.mandro.mark7.domain.model.ManualPreset
 import com.mandro.mark7.domain.model.MotorCommand
@@ -19,6 +20,9 @@ import kotlinx.coroutines.flow.StateFlow
  * (`data/ble/HandRepositoryImpl`) 가 둘을 합친다.
  */
 interface HandRepository {
+
+    /** 현재 선택된 의수 자유도 버전 (5 DOF, 6 DOF, 7 DOF) */
+    val activeDof: StateFlow<HandDof>
 
     // ── BLE 링크 ──────────────────────────────────────────────
     val bleState: Flow<BleState>

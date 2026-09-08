@@ -38,6 +38,9 @@ class HandRepositoryImpl @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    override val activeDof: StateFlow<com.mandro.mark7.domain.model.HandDof> =
+        configStore.activeDof.stateIn(scope, SharingStarted.Eagerly, com.mandro.mark7.domain.model.HandDof.DEFAULT)
+
     override val bleState: Flow<BleState> = bleManager.state
     override val status: Flow<HandStatus> = bleManager.status
 
@@ -56,11 +59,17 @@ class HandRepositoryImpl @Inject constructor(
     override suspend fun disconnect() = bleManager.disconnect()
 
     override suspend fun sendCommand(command: MotorCommand) = withContext(Dispatchers.IO) {
+        val normalizedSelect = BooleanArray(MarkSevenProtocol.DOF) { i ->
+            if (i < command.select.size) command.select[i] else false
+        }
+        val normalizedPos = IntArray(MarkSevenProtocol.DOF) { i ->
+            if (i < command.posDeg.size) command.posDeg[i] else 0
+        }
         val frame = MarkSevenProtocol.buildCmd(
-            select = command.select,
+            select = normalizedSelect,
             speedRaw = command.speedRaw,
             currentMa = command.currentMa,
-            posDeg = command.posDeg,
+            posDeg = normalizedPos,
             dir = command.dir,
         )
         bleManager.writeFrame(frame)

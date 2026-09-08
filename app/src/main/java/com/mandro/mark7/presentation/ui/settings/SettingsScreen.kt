@@ -64,7 +64,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mandro.mark7.R
-import com.mandro.mark7.core.locale.AppLocale
 import com.mandro.mark7.domain.model.GlobalSettings
 import com.mandro.mark7.domain.model.HandConfig
 import com.mandro.mark7.domain.model.HandStatus
@@ -134,8 +133,6 @@ fun SettingsScreenContent(
     ui: SettingsUiState,
     actions: SettingsEditActions,
 ) {
-    val context = LocalContext.current
-    val currentTag by AppLocale.currentTag.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
 
     // 한 번에 하나만 펼쳐진다. 펼쳐도 스크롤을 옮기지 않고 그 자리에서 펼친다.
@@ -150,33 +147,22 @@ fun SettingsScreenContent(
         expandedSection = if (expandedSection == id) null else id
     }
 
-    fun changeLang(tag: String) {
-        if (tag == currentTag) return
-        AppLocale.setTag(context, tag)
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Mark7Palette.Bg),
     ) {
-        // ── 1. 상단 타이틀 + 원터치 언어 세그먼트 토글 ──
-        Row(
+        // ── 1. 상단 타이틀 ──
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = stringResource(R.string.settings_title),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = Mark7Palette.Ink,
-            )
-            LanguageSegmentToggle(
-                currentTag = currentTag,
-                onSelect = { changeLang(it) },
             )
         }
 
@@ -212,9 +198,10 @@ fun SettingsScreenContent(
             ) {
                 MaxCurrentPresetRow(
                     values = draft.maxCurrent,
-                    onSetAll = { v -> draft = draft.copy(maxCurrent = List(6) { v }) },
+                    onSetAll = { v -> draft = draft.copy(maxCurrent = List(ui.dof.dof) { v }) },
                 )
                 PerDofSliders(
+                    dof = ui.dof,
                     values = draft.maxCurrent,
                     valueRange = 600f..1500f,
                     ticks = listOf(900f, 1200f),
@@ -229,13 +216,14 @@ fun SettingsScreenContent(
                 )
             }
 
-            // ── 모터 속도 (자유도별) ──
+            // ── 모터 속도 ──
             AccordionCard(
                 title = stringResource(R.string.settings_speed),
                 expanded = expandedSection == SEC_SPEED,
                 onToggle = { toggleSection(SEC_SPEED) },
             ) {
                 PerDofSliders(
+                    dof = ui.dof,
                     values = draft.motorSpeed,
                     valueRange = 0f..255f,
                     ticks = listOf(85f, 170f),
@@ -257,66 +245,6 @@ fun SettingsScreenContent(
 
 private fun List<Int>.withAt(i: Int, v: Int): List<Int> =
     toMutableList().also { if (i in indices) it[i] = v }
-
-/** ── 모던 캡슐형 언어 선택 토글 (간격이 좁고 콤팩트한 KO | EN 미니 세그먼트) ── */
-@Composable
-private fun LanguageSegmentToggle(
-    currentTag: String,
-    onSelect: (String) -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = Mark7Palette.SurfaceAlt,
-        border = BorderStroke(1.dp, Mark7Palette.Line),
-        modifier = Modifier.height(26.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(1.dp),
-        ) {
-            val isKo = currentTag == "ko"
-            LanguageCapsulePill(
-                label = "KO",
-                selected = isKo,
-                onClick = { onSelect("ko") },
-            )
-            LanguageCapsulePill(
-                label = "EN",
-                selected = !isKo,
-                onClick = { onSelect("en") },
-            )
-        }
-    }
-}
-
-@Composable
-private fun LanguageCapsulePill(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = if (selected) Mark7Palette.Accent else Color.Transparent,
-        shadowElevation = if (selected) 1.dp else 0.dp,
-        modifier = Modifier
-            .width(28.dp)
-            .height(22.dp),
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = label,
-                fontSize = 11.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) Color.White else Mark7Palette.InkMuted,
-            )
-        }
-    }
-}
 
 
 // 특징별 토글 섹션 식별자.
@@ -376,9 +304,10 @@ private fun AccordionCard(
     }
 }
 
-/** 자유도(F1~F6)별 단일값 슬라이더 6개. */
+/** 자유도별 단일값 슬라이더 (5/6/7개). */
 @Composable
 private fun PerDofSliders(
+    dof: com.mandro.mark7.domain.model.HandDof = com.mandro.mark7.domain.model.HandDof.DEFAULT,
     values: List<Int>,
     valueRange: ClosedFloatingPointRange<Float>,
     ticks: List<Float>,
@@ -386,13 +315,13 @@ private fun PerDofSliders(
     maxLabel: String,
     onCommit: (i: Int, v: Int) -> Unit,
 ) {
-    val motorResList = HandStatus.MOTOR_NAME_RES
-    for (i in 0..5) {
+    val motorResList = dof.motorNameRes
+    for (i in 0 until dof.dof) {
         val currentVal = values.getOrElse(i) { valueRange.start.roundToInt() }
         var liveVal by remember(currentVal) { mutableIntStateOf(currentVal) }
         Mark7Slider(
             leadingLabel = stringResource(motorResList[i]),
-            leadingWidth = 66.dp,
+            leadingWidth = 72.dp,
             value = liveVal.toFloat().coerceIn(valueRange.start, valueRange.endInclusive),
             onValueChange = { liveVal = it.roundToInt() },
             onValueChangeFinished = { onCommit(i, liveVal) },
