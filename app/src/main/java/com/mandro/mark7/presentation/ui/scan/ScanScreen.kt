@@ -41,6 +41,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +60,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mandro.mark7.R
 import com.mandro.mark7.domain.model.BleDevice
@@ -95,23 +99,49 @@ fun ScanScreen(
         if (hasPermission) viewModel.rescan()
     }
 
-    LaunchedEffect(Unit) {
-        if (!hasPermission) launcher.launch(BLE_PERMISSIONS)
+    // 화면으로 되돌아오면 즉시 기존 연결을 끊고 다시 BLE 탐색을 시작한다 (ON_START 시점에 즉각 발동).
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) {
+                viewModel.disconnectAndRescan()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
-    // 이 화면에서 '새로' 연결됐을 때만 Monitor 로 자동 전환한다. Connecting 단계를 거친 경우만
-    // 사용자가 여기서 연결을 시작한 것 → 자동 진입. 이미 연결된 채로 들어온 경우(Monitor 에서
-    // 뒤로가기)는 Connecting 을 안 거치므로 이 화면에 머무르고, 아래 '계속' 버튼으로 진입한다.
+    // 사용자가 기기의 '연결(Connect)' 버튼을 누르면 연결 완료 시 즉시 다음 화면(Monitor)으로 자동 전환한다.
+    var connectRequested by remember { mutableStateOf(false) }
     var sawConnecting by remember { mutableStateOf(false) }
+
     LaunchedEffect(ui.bleState) {
-        if (ui.bleState is BleState.Connecting) sawConnecting = true
+        when (ui.bleState) {
+            is BleState.Connecting -> sawConnecting = true
+            is BleState.Error, BleState.Disconnected -> {
+                sawConnecting = false
+                connectRequested = false
+            }
+            else -> Unit
+        }
     }
-    LaunchedEffect(ui.connected, sawConnecting) {
-        if (ui.connected && sawConnecting) onConnected()
+
+    LaunchedEffect(ui.connected, connectRequested, sawConnecting) {
+        if (ui.connected && (connectRequested || sawConnecting)) {
+            connectRequested = false
+            sawConnecting = false
+            onConnected()
+        }
     }
+
+    // 명시적으로 연결을 요청했을 때만 연결 완료 표식을 띄우고, 되돌아왔을 때는 1초의 잔상도 없이 즉시 탐색 UI가 뜨도록 함
+    val isEffectivelyConnected = ui.connected && (connectRequested || sawConnecting)
 
     ScanContent(
         ui = ui,
+        isConnected = isEffectivelyConnected,
         hasPermission = hasPermission,
         onRequestPermission = { launcher.launch(BLE_PERMISSIONS) },
         onOpenSettings = {
@@ -122,7 +152,10 @@ fun ScanScreen(
             )
         },
         onRescan = viewModel::rescan,
-        onConnect = viewModel::connect,
+        onConnect = { device ->
+            connectRequested = true
+            viewModel.connect(device)
+        },
         onContinue = onConnected,
     )
 }
@@ -136,15 +169,17 @@ private fun ScanContent(
     onRescan: () -> Unit,
     onConnect: (BleDevice) -> Unit,
     onContinue: () -> Unit,
+    isConnected: Boolean = ui.connected,
 ) {
     val state = ui.bleState
     val isConnecting = state is BleState.Connecting
     val connectingAddress = (state as? BleState.Connecting)?.device?.address
+    val connectedAddress = if (isConnected) (state as? BleState.Connected)?.device?.address else null
     val errorMessage = (state as? BleState.Error)?.message
 
     // 연결 전에는 주기적으로 재스캔 → 새 기기/신호세기가 계속 갱신돼 "찾고 있는" 느낌.
-    LaunchedEffect(hasPermission, ui.connected) {
-        if (!hasPermission || ui.connected) return@LaunchedEffect
+    LaunchedEffect(hasPermission, isConnected) {
+        if (!hasPermission || isConnected) return@LaunchedEffect
         while (true) {
             kotlinx.coroutines.delay(10_000)
             onRescan()
@@ -172,7 +207,7 @@ private fun ScanContent(
             Text(
                 text = stringResource(
                     when {
-                        ui.connected -> R.string.scan_sub_connected
+                        isConnected -> R.string.scan_sub_connected
                         isConnecting -> R.string.scan_sub_connecting
                         ui.devices.isNotEmpty() -> R.string.scan_sub_found
                         else -> R.string.scan_sub_scanning
@@ -194,7 +229,7 @@ private fun ScanContent(
             ) {
                 PulsingCircle(
                     isConnecting = isConnecting,
-                    isConnected = ui.connected,
+                    isConnected = isConnected,
                 )
             }
             Spacer(Modifier.height(24.dp))
@@ -254,27 +289,6 @@ private fun ScanContent(
             }
         }
 
-        // ── 연결된 상태로 들어온 경우: 앱으로 계속 진입 ──
-        if (ui.connected) {
-            item {
-                Button(
-                    onClick = onContinue,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Mark7Palette.Accent),
-                ) {
-                    Text(
-                        text = stringResource(R.string.scan_continue),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                    )
-                }
-            }
-        }
-
         // ── 기기 목록 ──
         if (ui.devices.isNotEmpty()) {
             item {
@@ -294,7 +308,7 @@ private fun ScanContent(
                     onConnect = { onConnect(device) },
                 )
             }
-        } else if (hasPermission && errorMessage == null && !ui.connected) {
+        } else if (hasPermission && errorMessage == null && !isConnected) {
             item {
                 Text(
                     text = stringResource(R.string.scan_no_devices_hint),
@@ -310,7 +324,7 @@ private fun ScanContent(
         // ── 다시 찾기 ──
         item {
             Spacer(Modifier.height(8.dp))
-            val retryEnabled = hasPermission && !ui.connected
+            val retryEnabled = hasPermission && !isConnected
             TextButton(
                 onClick = onRescan,
                 enabled = retryEnabled,
@@ -452,7 +466,10 @@ private fun DeviceCard(
                         strokeWidth = 2.dp,
                     )
                 } else {
-                    Text(stringResource(R.string.scan_connect), style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        text = stringResource(R.string.scan_connect),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
                 }
             }
         }
