@@ -26,4 +26,8 @@ sealed interface ConfigPushState {
     data class Error(val message: String) : ConfigPushState
 }
 
-const val MARK7_NAME_PREFIX = "m"
+/**
+ * Mark7 의수의 BLE 모듈(Chipsen)이 광고하는 기기 이름 프리픽스.
+ * 스캔 목록 필터 기준 — `startsWith` 로 비교하므로 "CHIPSEN", "CHIPSEN-1234" 등 모두 매치.
+ */
+const val MARK7_NAME_PREFIX = "chipsen"

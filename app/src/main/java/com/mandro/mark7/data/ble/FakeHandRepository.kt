@@ -41,10 +41,13 @@ class FakeHandRepository @Inject constructor(
 ) : HandRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val fakeDevice = BleDevice(name = "Mark7 (mock)", address = "00:00:00:00:00:00", rssi = -48)
+    private val fakeDevice = MOCK_DEVICE
 
     private val _bleState = MutableStateFlow<BleState>(BleState.Connected(fakeDevice))
     override val bleState: Flow<BleState> = _bleState.asStateFlow()
+
+    override val activeDof: StateFlow<com.mandro.mark7.domain.model.HandDof> =
+        configStore.activeDof.stateIn(scope, SharingStarted.Eagerly, com.mandro.mark7.domain.model.HandDof.DEFAULT)
 
     /** null 이면 자동 전환(=close 신호 시늉)을 따르고, 값이 있으면 그 모드로 고정. */
     private val forcedMode = MutableStateFlow<Int?>(null)
@@ -73,6 +76,8 @@ class FakeHandRepository @Inject constructor(
     override suspend fun stopScan() = Unit
 
     override suspend fun connect(device: BleDevice) {
+        _bleState.value = BleState.Connecting(device)
+        delay(200)
         _bleState.value = BleState.Connected(device)
     }
 
@@ -138,7 +143,11 @@ class FakeHandRepository @Inject constructor(
         )
     }
 
-    private companion object {
+    companion object {
+        /** mock 전용 합성 기기. 실제 스캔 결과와 구분되는 고정 주소를 가진다. */
+        const val MOCK_ADDRESS = "00:00:00:00:00:00"
+        val MOCK_DEVICE = BleDevice(name = "Mark7 (mock)", address = MOCK_ADDRESS, rssi = -48)
+
         const val STATUS_PERIOD_MS = 50L // 20Hz (실기기 Mark7 BLE STATUS 주기 약 10~20Hz와 일치)
         /** 현재 상태가 이 경로를 따라 한 칸씩 오간다: 대기→굽힘체인→대기→폄체인. */
         val STATE_PATH = listOf(1, 2, 3, 2, 1, 4, 5, 4)

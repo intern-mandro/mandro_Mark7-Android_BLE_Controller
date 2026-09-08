@@ -27,8 +27,9 @@ android {
             buildConfigField("Boolean", "USE_MOCK_BLE", "false")
         }
         debug {
-            // 실기기 없이 "연결된 상태"로 앱을 돌린다 (FakeHandRepository 바인딩).
-            buildConfigField("Boolean", "USE_MOCK_BLE", "true")
+            // 실기기 BLE 브링업 중 — mock 없이 실제 스캔/연결만 사용한다.
+            // (mock 이 필요하면 "true" → HybridHandRepository 가 mock+실제 스캔을 합쳐 노출)
+            buildConfigField("Boolean", "USE_MOCK_BLE", "false")
         }
     }
 
