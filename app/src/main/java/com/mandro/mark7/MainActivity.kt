@@ -92,7 +92,7 @@ import com.mandro.mark7.presentation.ui.manual.ManualScreen
 import com.mandro.mark7.presentation.ui.monitor.MonitorScreen
 import com.mandro.mark7.presentation.ui.scan.ScanScreen
 import com.mandro.mark7.presentation.ui.settings.SettingsScreen
-import com.mandro.mark7.presentation.ui.user.UserSetupScreen
+import com.mandro.mark7.presentation.ui.dof.DofSetupScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -186,9 +186,15 @@ class MainActivity : ComponentActivity() {
                 }
 
                 // 메인 페이저에서 Monitor(0페이지)가 아니면 안드로이드 뒤로가기 → Monitor 페이지로.
-                // Monitor 페이지에서의 뒤로가기는 NavHost 기본 동작(= Scan 으로 pop)에 맡긴다.
                 BackHandler(enabled = isMain && pagerState.currentPage != PAGE_MONITOR) {
                     goToPage(PAGE_MONITOR)
+                }
+
+                // Monitor 페이지에서 뒤로가기 시: 경고 토스트 없이 즉시 연결을 끊고 스캔 탐색 상태로 복귀
+                BackHandler(enabled = isMain && pagerState.currentPage == PAGE_MONITOR) {
+                    hasBeenConnected = false
+                    mainViewModel.disconnectAndRescan()
+                    navController.popBackStack(Screen.Scan.route, inclusive = false)
                 }
 
                 Scaffold(
@@ -210,6 +216,8 @@ class MainActivity : ComponentActivity() {
                             } else {
                                 ConnectionHeader(
                                     onScanClick = {
+                                        hasBeenConnected = false
+                                        mainViewModel.disconnectAndRescan()
                                         navController.navigate(Screen.Scan.route) {
                                             launchSingleTop = true
                                         }
@@ -302,14 +310,14 @@ class MainActivity : ComponentActivity() {
                 ) { padding ->
                     NavHost(
                         navController = navController,
-                        startDestination = Screen.UserSetup.route,
+                        startDestination = Screen.DofSetup.route,
                         modifier = Modifier.padding(padding),
                     ) {
-                        composable(Screen.UserSetup.route) {
-                            UserSetupScreen(
+                        composable(Screen.DofSetup.route) {
+                            DofSetupScreen(
                                 onDone = {
-                                    // UserSetup 을 스택에 남긴다 → 연결 화면에서 뒤로가기 시
-                                    // 다시 사용자 선택 화면으로 돌아온다.
+                                    // DofSetup 을 스택에 남긴다 → 연결 화면에서 뒤로가기 시
+                                    // 다시 의수 버전 선택 화면으로 돌아온다.
                                     navController.navigate(Screen.Scan.route) {
                                         launchSingleTop = true
                                     }

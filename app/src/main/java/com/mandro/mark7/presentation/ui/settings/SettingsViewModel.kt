@@ -14,7 +14,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import com.mandro.mark7.domain.model.HandDof
+
 data class SettingsUiState(
+    val dof: HandDof = HandDof.DEFAULT,
     val config: HandConfig = HandConfig.DEFAULT,
     /** SET 전송 진행 중 (버튼 비활성/문구 전환용). */
     val pushing: Boolean = false,
@@ -38,6 +41,7 @@ class SettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { repo.config.collect { c -> _uiState.update { it.copy(config = c) } } }
+        viewModelScope.launch { repo.activeDof.collect { d -> _uiState.update { it.copy(dof = d) } } }
     }
 
     override fun applyAndPush(settings: GlobalSettings) {

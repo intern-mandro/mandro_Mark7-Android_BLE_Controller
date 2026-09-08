@@ -56,10 +56,24 @@ data class HandStatus(
             R.string.motor_f4, R.string.motor_f5, R.string.motor_f6,
         )
 
-        /** 모터 6개 짧은 이름(수동 제어 칩용). */
-        val MOTOR_SHORT_RES = listOf(
+        /** 모터 7개 전체 표시 이름 리소스. */
+        val ALL_MOTOR_NAME_RES = listOf(
+            R.string.motor_f1, R.string.motor_f2, R.string.motor_f3,
+            R.string.motor_f4, R.string.motor_f5, R.string.motor_f6,
+            R.string.motor_f7,
+        )
+
+        /** 모터 7개 전체 짧은 이름 리소스. */
+        val ALL_MOTOR_SHORT_RES = listOf(
             R.string.motor_short_f1, R.string.motor_short_f2, R.string.motor_short_f3,
             R.string.motor_short_f4, R.string.motor_short_f5, R.string.motor_short_f6,
+            R.string.motor_short_f7,
         )
+
+        fun getMotorNameRes(dof: Int): List<Int> =
+            ALL_MOTOR_NAME_RES.take(dof.coerceIn(1, ALL_MOTOR_NAME_RES.size))
+
+        fun getMotorShortRes(dof: Int): List<Int> =
+            ALL_MOTOR_SHORT_RES.take(dof.coerceIn(1, ALL_MOTOR_SHORT_RES.size))
     }
 }
