@@ -42,6 +42,18 @@ class ScanViewModel @Inject constructor(
     }
 
     fun rescan() = viewModelScope.launch { repo.startScan() }
+    fun disconnectAndRescan() {
+        _uiState.update {
+            it.copy(
+                bleState = BleState.Scanning,
+                connected = false,
+            )
+        }
+        viewModelScope.launch {
+            repo.disconnect()
+            repo.startScan()
+        }
+    }
     fun connect(device: BleDevice) = viewModelScope.launch { repo.connect(device) }
     fun stopScan() = viewModelScope.launch { repo.stopScan() }
 }
