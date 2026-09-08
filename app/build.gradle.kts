@@ -27,9 +27,10 @@ android {
             buildConfigField("Boolean", "USE_MOCK_BLE", "false")
         }
         debug {
-            // 실기기 BLE 브링업 중 — mock 없이 실제 스캔/연결만 사용한다.
-            // (mock 이 필요하면 "true" → HybridHandRepository 가 mock+실제 스캔을 합쳐 노출)
-            buildConfigField("Boolean", "USE_MOCK_BLE", "false")
+            // mock-ble 브랜치 — HybridHandRepository 바인딩.
+            // 스캔 목록에 "Mark7 (mock)" 합성 기기 + 실제 BLE 스캔 결과를 함께 노출한다.
+            // mock 을 고르면 가짜 STATUS/ACK 스트림(하드웨어 불필요), 실기기를 고르면 실제 BLE.
+            buildConfigField("Boolean", "USE_MOCK_BLE", "true")
         }
     }
 
