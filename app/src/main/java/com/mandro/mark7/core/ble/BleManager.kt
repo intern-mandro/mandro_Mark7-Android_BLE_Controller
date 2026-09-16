@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
@@ -233,7 +234,7 @@ class BleManager @Inject constructor(
         type: Int,
     ): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            g.writeCharacteristic(ch, chunk, type) == BluetoothGatt.GATT_SUCCESS
+            g.writeCharacteristic(ch, chunk, type) == BluetoothStatusCodes.SUCCESS
         } else {
             @Suppress("DEPRECATION")
             ch.value = chunk
