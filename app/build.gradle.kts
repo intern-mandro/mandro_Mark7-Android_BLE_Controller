@@ -80,9 +80,6 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
 
     // ── 로컬 저장 ─────────────────────────────────────────────
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
     implementation(libs.datastore.preferences)
 
     // ── 제스처 사진 로딩 ──────────────────────────────────────
@@ -91,7 +88,4 @@ dependencies {
     // ── 테스트 ────────────────────────────────────────────────
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
-    androidTestImplementation(libs.junit.ext)
-    androidTestImplementation(libs.espresso.core)
-    androidTestImplementation(libs.compose.ui.test)
 }
