@@ -117,9 +117,6 @@ class HandRepositoryImpl @Inject constructor(
         configStore.saveMapping(mapping)
     }
 
-    override suspend fun setProgramMode(mode: Int): Result<Unit> =
-        Result.failure(UnsupportedOperationException(context.getString(R.string.ble_err_mode_unsupported)))
-
     override val manualPresets: StateFlow<List<ManualPreset>> =
         configStore.manualPresetsForDof(activeDof)
             .stateIn(scope, SharingStarted.Eagerly, CmdPresetCatalogs.forDof(HandDof.DEFAULT))

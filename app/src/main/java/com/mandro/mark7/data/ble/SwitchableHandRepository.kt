@@ -78,7 +78,6 @@ class SwitchableHandRepository(
     override suspend fun disconnect() = active.disconnect()
     override suspend fun sendCommand(command: MotorCommand) = active.sendCommand(command)
     override suspend fun pushConfig(config: HandConfig?): Result<Unit> = active.pushConfig(config)
-    override suspend fun setProgramMode(mode: Int): Result<Unit> = active.setProgramMode(mode)
 
     // ── 자유도 ────────────────────────────────────────────────
     override val selectedDof: StateFlow<HandDof> = mock.selectedDof

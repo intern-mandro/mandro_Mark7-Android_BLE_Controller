@@ -50,13 +50,6 @@ interface HandRepository {
     suspend fun updateActionMapping(mapping: ActionMapping)
     val syncedActionMapping: StateFlow<ActionMapping>
 
-    // ── program_mode (MODE1/MODE2) 전환 ─────────────────────
-    /**
-     * 의수 program_mode 를 [mode](1 또는 2)로 바꾼다. 펌웨어는 `close` 입력으로도
-     * 자동 전환하며, 변경 결과는 STATUS([HandStatus.programMode])로 되돌아온다.
-     */
-    suspend fun setProgramMode(mode: Int): Result<Unit>
-
     // ── 수동 제어 동작 프리셋 (앱 로컬 전용) ───────────────────────────
     val manualPresets: StateFlow<List<ManualPreset>>
     suspend fun saveManualPresets(presets: List<ManualPreset>)

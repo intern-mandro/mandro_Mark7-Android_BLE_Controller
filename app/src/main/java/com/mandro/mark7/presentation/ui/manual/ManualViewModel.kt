@@ -22,7 +22,6 @@ import com.mandro.mark7.domain.model.hand.HandDof
 data class ManualUiState(
     val dof: HandDof = HandDof.DEFAULT,
     val select: List<Boolean> = List(HandDof.DEFAULT.dof) { false },
-    val useCustomPower: Boolean = false,
     val speedRaw: Int = 20_000,
     val currentMa: Int = 900,
     val posDeg: List<Int> = List(HandDof.DEFAULT.dof) { 0 },
@@ -120,15 +119,15 @@ class ManualViewModel @Inject constructor(
     }
 
     fun resetPowerSettings() = _uiState.update {
-        it.copy(useCustomPower = false, speedRaw = DEFAULT_SPEED_RAW, currentMa = DEFAULT_CURRENT_MA)
+        it.copy(speedRaw = DEFAULT_SPEED_RAW, currentMa = DEFAULT_CURRENT_MA)
     }
 
     fun setSpeed(value: Int) = _uiState.update {
-        it.copy(speedRaw = value, useCustomPower = true)
+        it.copy(speedRaw = value)
     }
 
     fun setCurrent(value: Int) = _uiState.update {
-        it.copy(currentMa = value, useCustomPower = true)
+        it.copy(currentMa = value)
     }
 
     /**

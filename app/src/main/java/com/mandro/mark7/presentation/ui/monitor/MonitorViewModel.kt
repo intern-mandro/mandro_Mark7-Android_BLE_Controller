@@ -18,8 +18,6 @@ data class MonitorUiState(
     val dof: HandDof = HandDof.DEFAULT,
     val connected: Boolean = false,
     val status: HandStatus? = null,
-    /** 최근 STATUS 표본(오래된 것 → 최신). 시계열 그래프용. */
-    val history: List<HandStatus> = emptyList(),
     /** 오실로스코프 스위프 커서 쓰기 포인터 (0 until DISPLAY_SAMPLES) */
     val writePtr: Int = 0,
 )
@@ -64,7 +62,6 @@ class MonitorViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         status = st,
-                        history = (it.history + st).takeLast(HISTORY_MAX),
                         writePtr = nextPtr,
                     )
                 }
@@ -76,6 +73,5 @@ class MonitorViewModel @Inject constructor(
 
     companion object {
         const val DISPLAY_SAMPLES = 120
-        private const val HISTORY_MAX = 120
     }
 }

@@ -17,7 +17,6 @@ enum class HandAction(
 
 // 앱 로컬 저장용 매핑 묶음 (의수 자유도별로 따로 저장)
 data class ActionMapping(
-    val patternIndexByAction: Map<HandAction, Int> = emptyMap(),
     val gestureIdByState: Map<Int, String> = emptyMap(),
     val gradualGraspEnabled: Boolean = false,
     val dof: HandDof = HandDof.DEFAULT,
@@ -71,12 +70,6 @@ data class ActionMapping(
         // companion이 존재하면 뒤 슬롯에 채움, 없으면 withLead 그대로 둬서 뒤 슬롯은 빈 상태 유지
         val updated = slots.companion?.let { withLead + (pair.companionStateId to it.id) } ?: withLead
         return copy(gestureIdByState = updated)
-    }
-
-    fun clearGestureGroup(primaryStateId: Int): ActionMapping {
-        val pair = ActionSlotPairs.pairForPrimary(primaryStateId) ?: return this
-        // 앞/뒤 두 슬롯을 한 번에 삭제 (묶음 단위 데이터 삭제)
-        return copy(gestureIdByState = gestureIdByState - primaryStateId - pair.companionStateId)
     }
 
     // MSET의 S1~S8 슬롯을 항상 8개의 펌웨어 액션ID로 만듦 (비활성 슬롯ID는 99)

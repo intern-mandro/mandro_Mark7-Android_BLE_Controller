@@ -87,9 +87,9 @@ object GestureCatalogs {
         HandDof.DOF_7 -> DOF_7
     }
 
-    /** Pair 묶음: [front] 는 앞 노드(S1·S3…), [back] 은 뒤 노드(S2·S4…)에 함께 들어간다. */
+    // Pair 묶음: [front] 는 앞 노드(S1, S3…), [back] 은 뒤 노드(S2, S4…)에 함께 들어감
     private fun pair(front: Gesture, back: Gesture) = GestureSlots(lead = front, companion = back)
 
-    /** 단일 묶음: 앞 노드에만 들어가고 뒤 노드는 비활성이다. */
+    // 단일 묶음: 앞 노드에만 들어가고 뒤 노드는 비활성임
     private fun single(gesture: Gesture) = GestureSlots(lead = gesture, companion = null)
 }

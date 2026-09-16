@@ -51,7 +51,6 @@ class SwitchableHandRepositoryTest {
             calls += "pushConfig"
             return Result.success(Unit)
         }
-        override suspend fun setProgramMode(mode: Int): Result<Unit> = Result.success(Unit)
         override suspend fun updateConfig(config: HandConfig) = Unit
         override suspend fun updateActionMapping(mapping: ActionMapping) = Unit
         override suspend fun saveManualPresets(presets: List<ManualPreset>) = Unit

@@ -546,7 +546,7 @@ private fun MonitorPreview() {
     }
     Mark7Theme {
         MonitorContent(
-            ui = MonitorUiState(connected = true, status = hist.last(), history = hist, writePtr = 55),
+            ui = MonitorUiState(connected = true, status = hist.last(), writePtr = 55),
             emgBuffers = dummyBuffers,
             onDisconnect = {},
         )

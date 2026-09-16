@@ -55,7 +55,6 @@ class ManualViewModelTest {
         override val actionMapping: StateFlow<ActionMapping> = MutableStateFlow(ActionMapping())
         override val syncedActionMapping: StateFlow<ActionMapping> = actionMapping
         override suspend fun updateActionMapping(mapping: ActionMapping) {}
-        override suspend fun setProgramMode(mode: Int): Result<Unit> = Result.success(Unit)
         override val manualPresets: StateFlow<List<ManualPreset>> = MutableStateFlow(emptyList())
         override suspend fun saveManualPresets(presets: List<ManualPreset>) {}
         override suspend fun resetManualPresets() {}

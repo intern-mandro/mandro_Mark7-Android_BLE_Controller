@@ -9,7 +9,6 @@ import com.mandro.mark7.domain.model.hand.ManualPreset
 import com.mandro.mark7.domain.model.hand.CmdPresetCatalogs
 import com.mandro.mark7.domain.model.action.ActionMapping
 import com.mandro.mark7.domain.model.action.GestureCatalogs
-import com.mandro.mark7.domain.model.action.HandAction
 import com.mandro.mark7.domain.model.hand.HandDof
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -97,14 +96,10 @@ class HandConfigStore @Inject constructor(
     @Serializable
     private data class StoredMapping(
         val schemaVersion: Int = 1,
-        val byAction: Map<String, Int> = emptyMap(),
         val byState: Map<String, String> = emptyMap(),
         val gradual: Boolean = false,
     ) {
         fun toDomain(dof: HandDof) = ActionMapping(
-            patternIndexByAction = byAction.mapNotNull { (k, v) ->
-                runCatching { HandAction.valueOf(k) }.getOrNull()?.let { it to v }
-            }.toMap(),
             gestureIdByState = migrateStoredStateIds(byState, schemaVersion),
             gradualGraspEnabled = gradual,
             dof = dof,
@@ -113,7 +108,6 @@ class HandConfigStore @Inject constructor(
         companion object {
             fun fromDomain(m: ActionMapping) = StoredMapping(
                 schemaVersion = CURRENT_MAPPING_SCHEMA_VERSION,
-                byAction = m.patternIndexByAction.mapKeys { it.key.name },
                 byState = m.gestureIdByState.mapKeys { it.key.toString() },
                 gradual = m.gradualGraspEnabled,
             )

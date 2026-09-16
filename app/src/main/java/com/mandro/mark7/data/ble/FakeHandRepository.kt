@@ -119,8 +119,6 @@ class FakeHandRepository @Inject constructor(
         configStore.saveMapping(mapping)
     }
 
-    override suspend fun setProgramMode(mode: Int): Result<Unit> = Result.success(Unit)
-
     override val manualPresets: StateFlow<List<ManualPreset>> =
         configStore.manualPresetsForDof(activeDof)
             .stateIn(scope, SharingStarted.Eagerly, CmdPresetCatalogs.forDof(HandDof.DEFAULT))

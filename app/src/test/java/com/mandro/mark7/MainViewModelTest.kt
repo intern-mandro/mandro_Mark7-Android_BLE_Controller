@@ -53,7 +53,6 @@ class MainViewModelTest {
         override suspend fun updateConfig(config: HandConfig) = Unit
         override suspend fun pushConfig(config: HandConfig?): Result<Unit> = Result.success(Unit)
         override suspend fun updateActionMapping(mapping: ActionMapping) = Unit
-        override suspend fun setProgramMode(mode: Int): Result<Unit> = Result.success(Unit)
         override suspend fun saveManualPresets(presets: List<ManualPreset>) = Unit
         override suspend fun resetManualPresets() = Unit
     }

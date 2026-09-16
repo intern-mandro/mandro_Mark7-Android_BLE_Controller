@@ -56,7 +56,6 @@ class GesturePickerViewModelTest {
         override suspend fun updateActionMapping(mapping: ActionMapping) {
             actionMapping.value = mapping
         }
-        override suspend fun setProgramMode(mode: Int): Result<Unit> = Result.success(Unit)
         override val manualPresets: StateFlow<List<ManualPreset>> = MutableStateFlow(emptyList())
         override suspend fun saveManualPresets(presets: List<ManualPreset>) {}
         override suspend fun resetManualPresets() {}

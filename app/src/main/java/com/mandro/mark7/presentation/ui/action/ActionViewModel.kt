@@ -72,8 +72,6 @@ class ActionViewModel @Inject constructor(
         pushAndReport()
     }
 
-    fun clearAllGestures() = resetToDefault()
-
     fun pushConfig() = viewModelScope.launch {
         _uiState.update { it.copy(pushing = true) }
         pushAndReport()
