@@ -27,11 +27,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bluetooth
@@ -40,12 +38,12 @@ import androidx.compose.material.icons.filled.MonitorHeart
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -59,7 +57,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -75,7 +72,7 @@ import androidx.navigation.navArgument
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.mandro.mark7.core.locale.AppLocale
-import com.mandro.mark7.domain.model.BleState
+import com.mandro.mark7.domain.model.connection.BleState
 import com.mandro.mark7.presentation.navigation.BOTTOM_NAV_ITEMS
 import com.mandro.mark7.presentation.navigation.MAIN_TAB_COUNT
 import com.mandro.mark7.presentation.navigation.PAGE_MANUAL
@@ -130,6 +127,7 @@ class MainActivity : ComponentActivity() {
 
                 val mainViewModel: MainViewModel = hiltViewModel()
                 val bleState by mainViewModel.bleState.collectAsStateWithLifecycle()
+                val dofMismatch by mainViewModel.dofMismatch.collectAsStateWithLifecycle()
 
                 val scope = rememberCoroutineScope()
                 val pagerState = rememberPagerState(pageCount = { MAIN_TAB_COUNT })
@@ -141,7 +139,10 @@ class MainActivity : ComponentActivity() {
                 val isPicker = currentRoute == Screen.GesturePicker.route
                 val showChrome = isMain
                 val pickerStateId = backStackEntry?.arguments?.getString("state")?.toIntOrNull() ?: 0
-                val onPickerBack: () -> Unit = {
+                val onPickerBack: (String?) -> Unit = { notice ->
+                    if (notice != null) {
+                        navController.previousBackStackEntry?.savedStateHandle?.set("picker_notice", notice)
+                    }
                     navController.popBackStack(Screen.Main.route, inclusive = false)
                 }
                 // 상단바 ← 화살표도 시스템 뒤로가기와 같은 경로로 → GesturePickerScreen 의
@@ -197,6 +198,24 @@ class MainActivity : ComponentActivity() {
                     navController.popBackStack(Screen.Scan.route, inclusive = false)
                 }
 
+                // 연결 화면은 STATUS 를 기다리지 않고 바로 넘어오므로, STATUS 로 확인한 DOF 가 선택과 다르면 여기서 알린다.
+                val mismatchDof = dofMismatch
+                if ((isMain || isPicker) && mismatchDof != null) {
+                    DofMismatchDialog(
+                        connectedDof = mismatchDof.dof,
+                        onReselect = {
+                            hasBeenConnected = false
+                            mainViewModel.disconnect()
+                            navController.popBackStack(Screen.DofSetup.route, inclusive = false)
+                        },
+                        onDisconnect = {
+                            hasBeenConnected = false
+                            mainViewModel.disconnectAndRescan()
+                            navController.popBackStack(Screen.Scan.route, inclusive = false)
+                        },
+                    )
+                }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
@@ -211,15 +230,17 @@ class MainActivity : ComponentActivity() {
                             if (isPicker) {
                                 PickerTopBar(
                                     stateId = pickerStateId,
-                                    onBack = { backDispatcher?.onBackPressed() ?: onPickerBack() },
+                                    onBack = { backDispatcher?.onBackPressed() ?: onPickerBack(null) },
                                 )
                             } else {
                                 ConnectionHeader(
                                     onScanClick = {
                                         hasBeenConnected = false
                                         mainViewModel.disconnectAndRescan()
-                                        navController.navigate(Screen.Scan.route) {
-                                            launchSingleTop = true
+                                        // 메인 위에 연결 화면을 새로 쌓지 않고, 스택의 연결 화면으로 되돌아간다
+                                        // → 그 화면에서 뒤로가기 시 메인이 아니라 의수 버전 선택 화면으로 간다.
+                                        if (!navController.popBackStack(Screen.Scan.route, inclusive = false)) {
+                                            navController.navigate(Screen.Scan.route) { launchSingleTop = true }
                                         }
                                     },
                                 )
@@ -325,6 +346,10 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(Screen.Scan.route) {
+                            // 연결 화면에서 뒤로가기는 어디서 들어왔든 항상 의수 버전 선택 화면으로.
+                            BackHandler {
+                                navController.popBackStack(Screen.DofSetup.route, inclusive = false)
+                            }
                             ScanScreen(
                                 onConnected = {
                                     // Scan 을 스택에 남긴다 → Monitor 에서 뒤로가기 시 이 연결 창으로 복귀.
@@ -336,7 +361,19 @@ class MainActivity : ComponentActivity() {
                                 },
                             )
                         }
-                        composable(Screen.Main.route) {
+                        composable(
+                            route = Screen.Main.route,
+                            exitTransition = {
+                                if (targetState.destination.route?.startsWith("action/gesture") == true) {
+                                    fadeOut(animationSpec = androidx.compose.animation.core.tween(150))
+                                } else null
+                            },
+                            popEnterTransition = {
+                                if (initialState.destination.route?.startsWith("action/gesture") == true) {
+                                    fadeIn(animationSpec = androidx.compose.animation.core.tween(150))
+                                } else null
+                            },
+                        ) {
                             // 하단 탭 4개 = HorizontalPager 페이지. 옆으로 밀어서 탭 전환.
                             HorizontalPager(
                                 state = pagerState,
@@ -350,9 +387,17 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                     PAGE_MODE -> key(resetKeys[PAGE_MODE]) {
+                                        val pickerNotice by backStackEntry?.savedStateHandle
+                                            ?.getStateFlow<String?>("picker_notice", null)
+                                            ?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(null) }
+
                                         ModeFlowScreen(
                                             onPickGesture = { stateId ->
                                                 navController.navigate(Screen.GesturePicker.createRoute(stateId))
+                                            },
+                                            notice = pickerNotice,
+                                            onConsumeNotice = {
+                                                backStackEntry?.savedStateHandle?.remove<String>("picker_notice")
                                             },
                                         )
                                     }
@@ -364,6 +409,10 @@ class MainActivity : ComponentActivity() {
                         composable(
                             route = Screen.GesturePicker.route,
                             arguments = listOf(navArgument("state") { type = NavType.StringType }),
+                            enterTransition = { fadeIn(animationSpec = androidx.compose.animation.core.tween(150)) },
+                            exitTransition = { fadeOut(animationSpec = androidx.compose.animation.core.tween(150)) },
+                            popEnterTransition = { fadeIn(animationSpec = androidx.compose.animation.core.tween(150)) },
+                            popExitTransition = { fadeOut(animationSpec = androidx.compose.animation.core.tween(150)) },
                         ) {
                             // onPickerBack: 항상 모드 페이지로만 되돌아간다. 상단 제목/뒤로가기는
                             // Scaffold 의 PickerTopBar 가 담당한다.
@@ -375,6 +424,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+}
+
+/** 연결된 의수의 DOF(STATUS 기준)가 선택한 DOF 와 다를 때 메인 화면 위에 띄우는 안내. */
+@Composable
+private fun DofMismatchDialog(
+    connectedDof: Int,
+    onReselect: () -> Unit,
+    onDisconnect: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text(stringResource(R.string.dof_mismatch_title)) },
+        text = { Text(stringResource(R.string.dof_mismatch_message, connectedDof)) },
+        confirmButton = {
+            TextButton(onClick = onReselect) { Text(stringResource(R.string.dof_mismatch_reselect)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDisconnect) { Text(stringResource(R.string.dof_mismatch_disconnect)) }
+        },
+    )
 }
 
 /**

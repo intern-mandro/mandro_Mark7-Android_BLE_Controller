@@ -66,12 +66,4 @@ object AppLocale {
         val config = Configuration(base.resources.configuration).apply { setLocale(locale) }
         return base.createConfigurationContext(config)
     }
-
-    /** 태그를 기반으로 새 Configuration과 Context 생성 (리컴포지션 전용) */
-    fun createLocalizedContext(base: Context, tag: String): Pair<Configuration, Context> {
-        val locale = Locale.forLanguageTag(tag)
-        Locale.setDefault(locale)
-        val config = Configuration(base.resources.configuration).apply { setLocale(locale) }
-        return config to base.createConfigurationContext(config)
-    }
 }

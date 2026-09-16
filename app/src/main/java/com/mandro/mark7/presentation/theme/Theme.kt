@@ -26,23 +26,18 @@ object Mark7Palette {
     val SurfaceAlt = Color(0xFFF3F5F6)
     val Bg = Color(0xFFEDEFF0)
 
-    val Warn = Color(0xFFE8973C)        // 온도 주의
     val Danger = Color(0xFFDB4B4B)      // 과열 / 과전류
     val Ok = Color(0xFF2FA36B)
 
     // 동작 제어 (쥐기 / 펴기) 전용 고대비 의미 색상
-    val Grasp = Color(0xFF1E56A0)         // 쥐기 (선명한 코발트 블루)
-    val GraspSoft = Color(0xFFE8F1FC)     // 쥐기 연한 배경
-    val GraspBorder = Color(0xFF3B82F6)   // 쥐기 활성 강조 테두리
-    val Release = Color(0xFF0D824D)       // 펴기 (산뜻한 에메랄드 그린)
-    val ReleaseSoft = Color(0xFFE6F5EC)   // 펴기 연한 배경
-    val ReleaseBorder = Color(0xFF10B981) // 펴기 활성 강조 테두리
-
-    // 모터 6개 트레이스 색 — 구분은 뚜렷하되 형광·청록 없는 팔레트.
-    val motorColors = listOf(
-        Color(0xFF3060A8), Color(0xFFDE8F05), Color(0xFF6E8B3D),
-        Color(0xFFD55E00), Color(0xFFA25CA0), Color(0xFF8C6D4F),
-    )
+    val Grasp = Color(0xFF3A66C2)         // 쥐기 (산뜻한 블루)
+    val GraspSoft = Color(0xFFE7EEFB)     // 쥐기 연한 배경 (활성 하이라이트용 틴트)
+    val Release = Color(0xFF2FA46E)       // 펴기 (산뜻한 그린)
+    val ReleaseTextStrong = Color(0xFF268C5C) // 펴기 버튼 텍스트 전용 (아주 살짝 더 진한 그린)
+    val ReleaseSoft = Color(0xFFE5F5EC)   // 펴기 연한 배경 (활성 하이라이트용 틴트)
+    // 활성 강조 테두리 = 각 accent 색 자체 (action preset 칩 선택 상태와 동일 규칙).
+    val GraspBorder = Grasp
+    val ReleaseBorder = Release
 }
 
 private val LightScheme = lightColorScheme(

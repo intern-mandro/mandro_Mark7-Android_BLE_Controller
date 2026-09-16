@@ -3,10 +3,8 @@ package com.mandro.mark7.presentation.ui.settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,30 +13,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,15 +30,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -64,9 +43,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mandro.mark7.R
-import com.mandro.mark7.domain.model.GlobalSettings
-import com.mandro.mark7.domain.model.HandConfig
-import com.mandro.mark7.domain.model.HandStatus
+import com.mandro.mark7.domain.model.hand.GlobalSettings
+import com.mandro.mark7.domain.model.hand.HandDof
 import com.mandro.mark7.presentation.components.HeaderPillButton
 import com.mandro.mark7.presentation.components.Mark7Slider
 import com.mandro.mark7.presentation.components.ResetConfirmDialog
@@ -135,17 +113,8 @@ fun SettingsScreenContent(
 ) {
     val scrollState = rememberScrollState()
 
-    // 한 번에 하나만 펼쳐진다. 펼쳐도 스크롤을 옮기지 않고 그 자리에서 펼친다.
-    var expandedSection by rememberSaveable { mutableStateOf<String?>(null) }
-
-    // 슬라이더 편집은 이 draft 에만 반영된다. 'SET 전송' 을 눌러야 실제 config 에 커밋 + 의수 전송.
-    // 토글을 열거나 닫거나 다른 토글로 바꾸면 draft 는 마지막으로 커밋된 값으로 되돌아간다.
+    // 슬라이더 편집은 이 draft 에만 반영된다. '전송' 이 성공해야 config(= 의수에 마지막으로 보낸 값)에 저장된다.
     var draft by remember(ui.config.settings) { mutableStateOf(ui.config.settings) }
-    LaunchedEffect(expandedSection) { draft = ui.config.settings }
-
-    fun toggleSection(id: String) {
-        expandedSection = if (expandedSection == id) null else id
-    }
 
     Column(
         modifier = Modifier
@@ -177,13 +146,11 @@ fun SettingsScreenContent(
             val defaults = GlobalSettings.DEFAULT
 
             // ── 근전도(EMG) 센서 증폭 게인 (CH1·CH2) ──
-            AccordionCard(
+            SettingSectionCard(
                 title = stringResource(R.string.settings_emg_sens_title),
-                expanded = expandedSection == SEC_EMG,
-                onToggle = { toggleSection(SEC_EMG) },
             ) {
                 EmgBody(g = draft, onChange = { draft = it })
-                AccordionActionRow(
+                SettingActionRow(
                     pushing = ui.pushing,
                     onSend = { actions.applyAndPush(draft) },
                     onDefault = { draft = draft.copy(emgAmp = defaults.emgAmp) },
@@ -191,10 +158,8 @@ fun SettingsScreenContent(
             }
 
             // ── 최대 전류량 제한 (자유도별) ──
-            AccordionCard(
+            SettingSectionCard(
                 title = stringResource(R.string.settings_max_current_title),
-                expanded = expandedSection == SEC_MAX_CURRENT,
-                onToggle = { toggleSection(SEC_MAX_CURRENT) },
             ) {
                 MaxCurrentPresetRow(
                     values = draft.maxCurrent,
@@ -209,7 +174,7 @@ fun SettingsScreenContent(
                     maxLabel = "1500 mA",
                     onCommit = { i, v -> draft = draft.copy(maxCurrent = draft.maxCurrent.withAt(i, v)) },
                 )
-                AccordionActionRow(
+                SettingActionRow(
                     pushing = ui.pushing,
                     onSend = { actions.applyAndPush(draft) },
                     onDefault = { draft = draft.copy(maxCurrent = defaults.maxCurrent) },
@@ -217,10 +182,8 @@ fun SettingsScreenContent(
             }
 
             // ── 모터 속도 ──
-            AccordionCard(
+            SettingSectionCard(
                 title = stringResource(R.string.settings_speed),
-                expanded = expandedSection == SEC_SPEED,
-                onToggle = { toggleSection(SEC_SPEED) },
             ) {
                 PerDofSliders(
                     dof = ui.dof,
@@ -231,7 +194,7 @@ fun SettingsScreenContent(
                     maxLabel = "255",
                     onCommit = { i, v -> draft = draft.copy(motorSpeed = draft.motorSpeed.withAt(i, v)) },
                 )
-                AccordionActionRow(
+                SettingActionRow(
                     pushing = ui.pushing,
                     onSend = { actions.applyAndPush(draft) },
                     onDefault = { draft = draft.copy(motorSpeed = defaults.motorSpeed) },
@@ -246,21 +209,12 @@ fun SettingsScreenContent(
 private fun List<Int>.withAt(i: Int, v: Int): List<Int> =
     toMutableList().also { if (i in indices) it[i] = v }
 
-
-// 특징별 토글 섹션 식별자.
-private const val SEC_EMG = "emg"
-private const val SEC_MAX_CURRENT = "maxCurrent"
-private const val SEC_SPEED = "speed"
-
 /**
- * 특징 하나를 감싸는 접이식 토글 카드. 헤더(제목 + chevron)를 누르면 펼쳐지고, 펼쳤을 때만
- * [body] 를 보여준다. 시각 스타일은 기존 '전문가 세부 피팅' 아코디언과 동일.
+ * 특징 하나를 감싸는 섹션 카드.
  */
 @Composable
-private fun AccordionCard(
+private fun SettingSectionCard(
     title: String,
-    expanded: Boolean,
-    onToggle: () -> Unit,
     modifier: Modifier = Modifier,
     body: @Composable ColumnScope.() -> Unit,
 ) {
@@ -271,35 +225,16 @@ private fun AccordionCard(
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onToggle() },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Mark7Palette.Ink,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = onToggle) {
-                    Icon(
-                        imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                        contentDescription = if (expanded) stringResource(R.string.settings_collapse) else stringResource(R.string.settings_expand),
-                        tint = Mark7Palette.InkMuted,
-                    )
-                }
-            }
-
-            if (expanded) {
-                Spacer(Modifier.height(12.dp))
-                HorizontalDivider(color = Mark7Palette.Line)
-                Spacer(Modifier.height(12.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp), content = body)
-            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Mark7Palette.Ink,
+            )
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = Mark7Palette.Line)
+            Spacer(Modifier.height(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), content = body)
         }
     }
 }
@@ -307,7 +242,7 @@ private fun AccordionCard(
 /** 자유도별 단일값 슬라이더 (5/6/7개). */
 @Composable
 private fun PerDofSliders(
-    dof: com.mandro.mark7.domain.model.HandDof = com.mandro.mark7.domain.model.HandDof.DEFAULT,
+    dof: HandDof = HandDof.DEFAULT,
     values: List<Int>,
     valueRange: ClosedFloatingPointRange<Float>,
     ticks: List<Float>,
@@ -371,11 +306,22 @@ private fun EmgBody(
     g: GlobalSettings,
     onChange: (GlobalSettings) -> Unit,
 ) {
-    val amp0 = g.emgAmp.getOrElse(0) { 20 }
-    val amp1 = g.emgAmp.getOrElse(1) { 20 }
+    val amp0 = g.emgAmp.getOrElse(0) { 10 }
+    val amp1 = g.emgAmp.getOrElse(1) { 10 }
     var live0 by remember(amp0) { mutableIntStateOf(amp0) }
     var live1 by remember(amp1) { mutableIntStateOf(amp1) }
     val emgTicks = remember { listOf(7f, 14f) }
+
+    val lowLabel = stringResource(R.string.settings_preset_sens_low)
+    val midLabel = stringResource(R.string.settings_preset_sens_mid)
+    val highLabel = stringResource(R.string.settings_preset_sens_high)
+
+    // 채널별 둔감/보통/민감 프리셋 구간 (해당 채널만 검사·설정)
+    fun sensIntervals(current: Int, apply: (Int) -> Unit) = listOf(
+        SliderInterval(label = lowLabel, isActive = current <= 7, onClick = { apply(6) }, weight = 7f),
+        SliderInterval(label = midLabel, isActive = current in 8..14, onClick = { apply(11) }, weight = 7f),
+        SliderInterval(label = highLabel, isActive = current > 14, onClick = { apply(16) }, weight = 6f),
+    )
 
     // 채널 1 (CH 1)
     Mark7Slider(
@@ -389,6 +335,8 @@ private fun EmgBody(
         minLabel = "Lv. 0",
         maxLabel = "Lv. 20",
         formatValue = { "${it.roundToInt()}" },
+        // isActive 는 드래그 중인 live 값을 따르고, 구간 탭 시엔 thumb 도 함께 이동시킨다.
+        intervals = sensIntervals(live0) { live0 = it; onChange(g.copy(emgAmp = g.emgAmp.withAt(0, it))) },
     )
 
     // 채널 2 (CH 2)
@@ -403,37 +351,18 @@ private fun EmgBody(
         minLabel = "Lv. 0",
         maxLabel = "Lv. 20",
         formatValue = { "${it.roundToInt()}" },
-        intervals = listOf(
-            SliderInterval(
-                label = stringResource(R.string.settings_preset_sens_low),
-                isActive = amp0 <= 7 && amp1 <= 7,
-                onClick = { onChange(g.copy(emgAmp = List(2) { 6 })) },
-                weight = 7f,
-            ),
-            SliderInterval(
-                label = stringResource(R.string.settings_preset_sens_mid),
-                isActive = amp0 in 8..14 && amp1 in 8..14,
-                onClick = { onChange(g.copy(emgAmp = List(2) { 11 })) },
-                weight = 7f,
-            ),
-            SliderInterval(
-                label = stringResource(R.string.settings_preset_sens_high),
-                isActive = amp0 > 14 && amp1 > 14,
-                onClick = { onChange(g.copy(emgAmp = List(2) { 16 })) },
-                weight = 6f,
-            ),
-        ),
+        intervals = sensIntervals(live1) { live1 = it; onChange(g.copy(emgAmp = g.emgAmp.withAt(1, it))) },
     )
 }
 
 /**
- * 각 토글(특징) 본문 맨 아래에 들어가는 [디폴트][SET 전송] 버튼 줄.
- * - 디폴트: 그 특징의 파라미터를 기본값으로 되돌린다. 누르면 먼저 확인 다이얼로그를 띄운다.
+ * 각 섹션 카드 본문 맨 아래에 들어가는 [디폴트][SET 전송] 버튼 줄.
+ * - 디폴트: 그 섹션의 파라미터를 기본값으로 되돌린다. 누르면 먼저 확인 다이얼로그를 띄운다.
  * - SET 전송: 전체 설정을 SET 프레임으로 의수에 보낸다(SET 은 통짜라 특징별 분리 전송은 불가).
  *   전송 중엔 버튼 비활성 + 문구 전환, 결과는 화면 상단 배너(Mode 탭과 동일)로 표시된다.
  */
 @Composable
-private fun AccordionActionRow(
+private fun SettingActionRow(
     pushing: Boolean,
     onSend: () -> Unit,
     onDefault: () -> Unit,
@@ -449,13 +378,13 @@ private fun AccordionActionRow(
     ) {
         OutlinedButton(
             onClick = { showResetConfirm = true },
-            modifier = Modifier.height(36.dp),
-            shape = RoundedCornerShape(8.dp),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+            modifier = Modifier.height(30.dp),
+            shape = RoundedCornerShape(6.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
         ) {
             Text(
                 text = stringResource(R.string.settings_reset),
-                fontSize = 12.sp,
+                fontSize = 11.5.sp,
                 fontWeight = FontWeight.Medium,
             )
         }
@@ -465,13 +394,13 @@ private fun AccordionActionRow(
             colors = ButtonDefaults.buttonColors(containerColor = Mark7Palette.Accent),
             modifier = Modifier
                 .weight(1f)
-                .height(36.dp),
-            shape = RoundedCornerShape(8.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                .height(30.dp),
+            shape = RoundedCornerShape(6.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
         ) {
             Text(
                 text = stringResource(if (pushing) R.string.common_sending else R.string.settings_send_set),
-                fontSize = 12.5.sp,
+                fontSize = 11.5.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
             )
@@ -490,7 +419,7 @@ private fun AccordionActionRow(
 
 /** [SettingsViewModel] 에서 화면이 쓰는 편집 액션 인터페이스. */
 interface SettingsEditActions {
-    /** draft 설정을 로컬에 커밋하고 곧바로 SET 프레임으로 의수에 전송한다. (토글별 'SET 전송') */
+    /** draft 설정을 SET 프레임으로 의수에 전송하고, 성공하면 "마지막으로 보낸 값"으로 로컬에 저장한다. (토글별 '전송') */
     fun applyAndPush(settings: GlobalSettings)
 }
 

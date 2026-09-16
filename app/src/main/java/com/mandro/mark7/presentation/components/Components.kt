@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,15 +47,11 @@ import com.mandro.mark7.R
 import com.mandro.mark7.presentation.theme.Mark7Palette
 import kotlin.math.roundToInt
 
-/**
- * '기본값' 등 되돌릴 수 없는 초기화 액션 앞에 띄우는 공통 확인 다이얼로그.
- * 표시 여부는 호출부에서 관리하고, 이 컴포저블이 보이면 이미 "확인" 대기 상태다.
- * [onConfirm] 은 확인 시 1회 호출된다(다이얼로그는 그 전에 닫힌다).
- */
 @Composable
 fun ResetConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    title: String = stringResource(R.string.common_reset_title),
     message: String = stringResource(R.string.common_reset_msg),
 ) {
     AlertDialog(
@@ -65,7 +60,7 @@ fun ResetConfirmDialog(
         tonalElevation = 0.dp,
         title = {
             Text(
-                text = stringResource(R.string.common_reset_title),
+                text = title,
                 fontWeight = FontWeight.Bold,
                 color = Mark7Palette.Ink,
             )
@@ -114,22 +109,6 @@ fun SectionCard(
     }
 }
 
-/** 라벨 + 값 한 줄. 모니터링/상태 표시에 사용. */
-@Composable
-fun StatRow(label: String, value: String, emphasize: Boolean = false) {
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = Mark7Palette.InkMuted)
-        Text(
-            value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (emphasize) FontWeight.SemiBold else FontWeight.Normal,
-        )
-    }
-}
-
 /**
  * 슬라이더 하단에 표시되는 구간 프리셋 정보
  */
@@ -140,13 +119,6 @@ data class SliderInterval(
     val weight: Float = 1f,
 )
 
-/**
- * Mark7 전용 커스텀 슬라이더.
- * - 상단: (선택) 타이틀, 최소/최대 기준값 표시 (도달 시 파란색 볼드 강조), 썸(Thumb) 추종 동적 수치 표시
- * - 좌측: (선택) leadingLabel (예: "CH 1", "CH 2") 트랙 중심 수평 정렬
- * - 트랙: 구간 구분선(ticks), 점(dots) 없는 매끄러운 6dp 바
- * - 하단: (선택) 구간 라벨(Soft, Standard, Strong 등)
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Mark7Slider(
@@ -228,27 +200,20 @@ fun Mark7Slider(
                         val distFromMinDp = (thumbCenter - thumbRadius).coerceAtLeast(0.dp)
                         val distFromMaxDp = (maxWidth - thumbRadius - thumbCenter).coerceAtLeast(0.dp)
 
-                        val mergeRangeDp = 20.dp
-                        val minProgress = (distFromMinDp / mergeRangeDp).coerceIn(0f, 1f)
-                        val maxProgress = (distFromMaxDp / mergeRangeDp).coerceIn(0f, 1f)
-
-                        val minColor = androidx.compose.ui.graphics.lerp(
-                            Mark7Palette.Accent,
-                            Mark7Palette.InkMuted,
-                            if (isAtMin) 0f else minProgress,
-                        )
-                        val maxColor = androidx.compose.ui.graphics.lerp(
-                            Mark7Palette.Accent,
-                            Mark7Palette.InkMuted,
-                            if (isAtMax) 0f else maxProgress,
-                        )
+                        val edgeGuardDp = 34.dp
+                        val fadeSpanDp = 12.dp
+                        val minLabelAlpha = if (isAtMin) 1f
+                        else ((distFromMinDp - edgeGuardDp) / fadeSpanDp).coerceIn(0f, 1f)
+                        val maxLabelAlpha = if (isAtMax) 1f
+                        else ((distFromMaxDp - edgeGuardDp) / fadeSpanDp).coerceIn(0f, 1f)
 
                         Text(
                             text = minLabel,
                             fontSize = 10.sp,
                             lineHeight = 12.sp,
-                            fontWeight = if (isAtMin || minProgress < 0.2f) FontWeight.Bold else FontWeight.Normal,
-                            color = minColor,
+                            fontWeight = if (isAtMin) FontWeight.Bold else FontWeight.Normal,
+                            color = (if (isAtMin) Mark7Palette.Accent else Mark7Palette.InkMuted)
+                                .copy(alpha = minLabelAlpha),
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
                                 .padding(start = 7.dp),
@@ -258,25 +223,21 @@ fun Mark7Slider(
                             text = maxLabel,
                             fontSize = 10.sp,
                             lineHeight = 12.sp,
-                            fontWeight = if (isAtMax || maxProgress < 0.2f) FontWeight.Bold else FontWeight.Normal,
-                            color = maxColor,
+                            fontWeight = if (isAtMax) FontWeight.Bold else FontWeight.Normal,
+                            color = (if (isAtMax) Mark7Palette.Accent else Mark7Palette.InkMuted)
+                                .copy(alpha = maxLabelAlpha),
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
                                 .padding(end = 7.dp),
                         )
 
-                        val floatingAlpha = when {
-                            isAtMin || isAtMax -> 0f
-                            else -> minOf(minProgress, maxProgress)
-                        }
-
-                        if (floatingAlpha > 0.01f) {
+                        if (!isAtMin && !isAtMax) {
                             Text(
                                 text = formatValue(value),
                                 fontSize = 10.sp,
                                 lineHeight = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Mark7Palette.Accent.copy(alpha = floatingAlpha),
+                                color = Mark7Palette.Accent,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .layout { measurable, constraints ->
@@ -395,7 +356,6 @@ fun Mark7Slider(
     }
 }
 
-/** 카드 헤더 우측의 작은 알약형 버튼 (프리셋 / 일괄 설정 / 추가 등). 배경 틴트 + 넉넉한 패딩. */
 @Composable
 fun HeaderPillButton(
     text: String,

@@ -2,11 +2,13 @@ package com.mandro.mark7.presentation.ui.monitor
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -26,7 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +38,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -49,7 +52,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mandro.mark7.R
-import com.mandro.mark7.domain.model.HandStatus
+import com.mandro.mark7.domain.model.hand.HandStatus
+import com.mandro.mark7.domain.model.hand.HandDof
 import com.mandro.mark7.presentation.components.SectionCard
 import com.mandro.mark7.presentation.theme.Mark7Palette
 import com.mandro.mark7.presentation.theme.Mark7Theme
@@ -79,6 +83,9 @@ private fun MonitorContent(
 ) {
     val status = ui.status
 
+    // STATUS 미수신이면 레이아웃(테이블 "-" / EMG "신호 없음")은 그대로 두고
+    // 그 위에 어두운 스크림 + 중앙 경고 창을 덮어 사용자가 즉시 인지하게 한다.
+    Box(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
@@ -94,23 +101,15 @@ private fun MonitorContent(
             color = Mark7Palette.Ink,
         )
 
-        if (status == null) {
-            SectionCard(title = stringResource(R.string.common_state)) {
-                Text(stringResource(R.string.monitor_waiting_status), color = Mark7Palette.InkMuted)
-            }
-            return@Column
-        }
-
-        val history = ui.history
-
-        // 1. 모터 상태 테이블 (온도 및 전류 수치)
+        // 1. 모터 상태 테이블 (온도 및 위치/회전량 수치)
         SectionCard(
             title = "${stringResource(R.string.monitor_card_motor_status)} (${ui.dof.dof} DOF)",
+            trailing = { VoltageReading(voltageText = status?.voltageText) },
         ) {
             MotorStatusTable(
                 dof = ui.dof,
-                temps = status.motorTemp,
-                currents = status.motorCurrentAvg,
+                temps = status?.motorTemp,
+                turns = status?.motorTurn,
             )
         }
 
@@ -129,8 +128,8 @@ private fun MonitorContent(
                 // CH 1 (빨간색 - MandroPalette.WaveCH0: #E44444)
                 EmgChannelRow(
                     channelName = "CH 1",
-                    value = status.emg.getOrElse(0) { 0 },
-                    buffer = emgBuffers?.getOrNull(0),
+                    value = status?.emg?.getOrNull(0),
+                    buffer = status?.let { emgBuffers?.getOrNull(0) },
                     writePtr = ui.writePtr,
                     color = Color(0xFFE44444),
                 )
@@ -143,26 +142,102 @@ private fun MonitorContent(
                 // CH 2 (파란색 - MandroPalette.WaveCH5: #446CE4)
                 EmgChannelRow(
                     channelName = "CH 2",
-                    value = status.emg.getOrElse(1) { 0 },
-                    buffer = emgBuffers?.getOrNull(1),
+                    value = status?.emg?.getOrNull(1),
+                    buffer = status?.let { emgBuffers?.getOrNull(1) },
                     writePtr = ui.writePtr,
                     color = Color(0xFF446CE4),
                 )
             }
         }
     }
+
+        if (status == null) WaitingStatusOverlay()
+    }
 }
 
-/** 모터의 온도와 소비 전류를 정갈하게 정렬한 3열 계측 테이블 */
+/** 데이터가 아직 없을 때 계측 자리를 채우는 플레이스홀더. */
+private const val PLACEHOLDER_DASH = "-"
+
+/** 모터 상태 카드 제목 줄 오른쪽의 STATUS 전압(예: "12.7 V"). STATUS 미수신이면 "-". */
+@Composable
+private fun VoltageReading(voltageText: String?) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text(
+            text = voltageText ?: PLACEHOLDER_DASH,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = Mark7Palette.Ink,
+        )
+        Text(
+            text = " V",
+            style = MaterialTheme.typography.labelMedium,
+            color = Mark7Palette.InkMuted,
+        )
+    }
+}
+
+/**
+ * STATUS 미수신 상태를 알리는 중앙 경고 창 + 어두운 스크림. 연결은 됐지만 프로토콜이 안 맞아
+ * STATUS 가 해석되지 않을 때도 여기로 들어와 이 안내가 뜬다.
+ * 스크림이 아래 컨텐츠 터치를 삼켜 "지금은 상호작용 불가"를 분명히 한다.
+ */
+@Composable
+private fun BoxScope.WaitingStatusOverlay() {
+    Box(
+        modifier = Modifier
+            .matchParentSize()
+            .background(Color.Black.copy(alpha = 0.7f))
+            .pointerInput(Unit) { detectTapGestures { /* 아래로 통과 차단 */ } },
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = Mark7Palette.Surface,
+            shadowElevation = 8.dp,
+            modifier = Modifier
+                .fillMaxWidth(0.82f)
+                .padding(horizontal = 24.dp),
+        ) {
+            Column(
+                Modifier.padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                // 대기는 오류가 아니라 "찾는 중" — 스피너를 표식으로 쓴다.
+                CircularProgressIndicator(
+                    modifier = Modifier.size(32.dp),
+                    strokeWidth = 3.dp,
+                    color = Mark7Palette.Accent,
+                )
+                Text(
+                    text = stringResource(R.string.monitor_waiting_status),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Mark7Palette.Ink,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = stringResource(R.string.monitor_waiting_status_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Mark7Palette.InkMuted,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+/** 모터의 온도와 소비 전류를 정갈하게 정렬한 3열 계측 테이블.
+ *  [temps]/[currents] 가 null 이면(STATUS 미수신) 값 자리를 "-" 로 표시한다. */
 @Composable
 private fun MotorStatusTable(
-    dof: com.mandro.mark7.domain.model.HandDof = com.mandro.mark7.domain.model.HandDof.DEFAULT,
-    temps: IntArray,
-    currents: IntArray,
+    dof: HandDof = HandDof.DEFAULT,
+    temps: IntArray?,
+    turns: IntArray?,
 ) {
     val motorResList = dof.motorNameRes
     Column(Modifier.fillMaxWidth()) {
-        // 테이블 컬럼 헤더 (모터, 온도, 소비 전류 각 구역 중앙 정렬)
+        // 테이블 컬럼 헤더 (모터, 온도, 위치/회전량 각 구역 중앙 정렬)
         Row(
             Modifier
                 .fillMaxWidth()
@@ -191,7 +266,7 @@ private fun MotorStatusTable(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = stringResource(R.string.monitor_current_label),
+                text = stringResource(R.string.monitor_turn_label),
                 style = MaterialTheme.typography.labelSmall,
                 color = Mark7Palette.InkMuted,
                 textAlign = TextAlign.Center,
@@ -206,8 +281,8 @@ private fun MotorStatusTable(
 
         // 모터 행 (자유도 개수에 맞게)
         for (i in 0 until dof.dof) {
-            val temp = temps.getOrElse(i) { 0 }
-            val current = currents.getOrElse(i) { 0 }
+            val temp = temps?.getOrNull(i)
+            val turn = turns?.getOrNull(i)
             val motorName = stringResource(motorResList.getOrElse(i) { R.string.motor_f1 })
 
             Row(
@@ -236,55 +311,45 @@ private fun MotorStatusTable(
                         .background(Mark7Palette.Line.copy(alpha = 0.5f)),
                 )
 
-                // 온도 (숫자 + 단위) - 중앙 정렬
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    Text(
-                        text = "$temp",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Mark7Palette.Ink,
-                    )
-                    Spacer(Modifier.size(2.dp))
-                    Text(
-                        text = "°C",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Mark7Palette.InkMuted,
-                        modifier = Modifier.padding(bottom = 1.5.dp),
-                    )
-                }
+                // 온도 (숫자 + 단위) - 중앙 정렬. 값 없으면 "-"
+                MetricCell(value = temp?.let { "$it" }, unit = "°C")
 
-                // 소비 전류 (숫자 + 단위) - 중앙 정렬
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    Text(
-                        text = "%,d".format(current),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Mark7Palette.Ink,
-                    )
-                    Spacer(Modifier.size(2.dp))
-                    Text(
-                        text = "mA",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Mark7Palette.InkMuted,
-                        modifier = Modifier.padding(bottom = 1.5.dp),
-                    )
-                }
+                // 위치/회전량 (uint8, 단위 없음) - 중앙 정렬. 값 없으면 "-"
+                MetricCell(value = turn?.let { "$it" }, unit = "")
             }
 
-            if (i < 5) {
+            if (i < dof.dof - 1) {
                 HorizontalDivider(
                     color = Mark7Palette.SurfaceAlt,
                     thickness = 0.8.dp,
                 )
             }
+        }
+    }
+}
+
+/** 계측값 1칸(숫자 + 단위)을 가로 중앙에 배치. [value] 가 null 이면 단위 없이 "-" 만 표시. */
+@Composable
+private fun RowScope.MetricCell(value: String?, unit: String) {
+    Row(
+        modifier = Modifier.weight(1f),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(
+            text = value ?: PLACEHOLDER_DASH,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+            color = if (value != null) Mark7Palette.Ink else Mark7Palette.InkMuted,
+        )
+        if (value != null && unit.isNotEmpty()) {
+            Spacer(Modifier.size(2.dp))
+            Text(
+                text = unit,
+                style = MaterialTheme.typography.labelSmall,
+                color = Mark7Palette.InkMuted,
+                modifier = Modifier.padding(bottom = 1.5.dp),
+            )
         }
     }
 }
@@ -304,7 +369,7 @@ private const val MIN_DISPLAY_RANGE = 60f
 @Composable
 private fun EmgChannelRow(
     channelName: String,
-    value: Int,
+    value: Int?,
     buffer: FloatArray?,
     writePtr: Int,
     color: Color,
@@ -339,7 +404,7 @@ private fun EmgChannelRow(
                 modifier = Modifier.align(Alignment.Center),
             )
             Text(
-                text = "$value",
+                text = value?.toString() ?: PLACEHOLDER_DASH,
                 style = TextStyle(
                     fontSize = 9.5.sp,
                     fontWeight = FontWeight.Medium,
@@ -462,15 +527,14 @@ private fun EmgChannelRow(
 @Composable
 private fun MonitorPreview() {
     val hist = List(60) { k ->
-        val ch1 = (sin(k * 0.25) * 120 + 512 + (k % 7) * 15).toInt()
-        val ch2 = (cos(k * 0.2) * 140 + 512 + (k % 5) * 20).toInt()
+        val ch1 = (sin(k * 0.25) * 60 + 128 + (k % 7) * 6).toInt().coerceIn(0, 255)
+        val ch2 = (cos(k * 0.2) * 70 + 120 + (k % 5) * 8).toInt().coerceIn(0, 255)
         HandStatus(
+            dof = 6,
             motorTemp = intArrayOf(38, 41, 46, 43, 62, 39),
-            motorCurrentAvg = intArrayOf(210, 320, 680, 450, 1250, 190),
-            motorTurn = IntArray(6) { 0 },
+            motorTurn = intArrayOf(18, 92, 140, 138, 130, 40),
             emg = intArrayOf(ch1, ch2),
-            currentState = 2,
-            programMode = 1,
+            voltage = 200,
             checksumOk = true,
         )
     }
@@ -484,6 +548,18 @@ private fun MonitorPreview() {
         MonitorContent(
             ui = MonitorUiState(connected = true, status = hist.last(), history = hist, writePtr = 55),
             emgBuffers = dummyBuffers,
+            onDisconnect = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, heightDp = 800, name = "STATUS 미수신 (플레이스홀더)")
+@Composable
+private fun MonitorWaitingPreview() {
+    Mark7Theme {
+        MonitorContent(
+            ui = MonitorUiState(connected = true, status = null),
+            emgBuffers = Array(2) { FloatArray(0) },
             onDisconnect = {},
         )
     }
