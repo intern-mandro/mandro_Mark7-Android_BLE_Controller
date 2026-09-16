@@ -1,7 +1,6 @@
 package com.mandro.mark7.presentation.ui.dof
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -33,9 +32,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.PrecisionManufacturing
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -68,7 +64,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mandro.mark7.R
 import com.mandro.mark7.core.locale.AppLocale
-import com.mandro.mark7.domain.model.HandDof
+import com.mandro.mark7.domain.model.hand.HandDof
 import com.mandro.mark7.presentation.theme.Mark7Palette
 import com.mandro.mark7.presentation.theme.Mark7Theme
 

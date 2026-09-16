@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.EaseOut
@@ -16,6 +17,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,11 +34,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,6 +59,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,9 +70,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mandro.mark7.BuildConfig
 import com.mandro.mark7.R
-import com.mandro.mark7.domain.model.BleDevice
-import com.mandro.mark7.domain.model.BleState
+import com.mandro.mark7.domain.model.connection.BleDevice
+import com.mandro.mark7.domain.model.connection.BleState
 import com.mandro.mark7.presentation.theme.Mark7Palette
 import com.mandro.mark7.presentation.theme.Mark7Theme
 
@@ -84,19 +91,21 @@ fun ScanScreen(
     val context = LocalContext.current
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
 
-    var hasPermission by remember {
+    var hasBlePermission by remember {
         mutableStateOf(
             BLE_PERMISSIONS.all {
                 ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
             },
         )
     }
+    // mock 모드는 BLE 를 쓰지 않으므로 권한 없이도 탐색·연결 UI 를 연다.
+    val hasPermission = hasBlePermission || ui.mockMode
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) { results ->
-        hasPermission = results.values.all { it }
-        if (hasPermission) viewModel.rescan()
+        hasBlePermission = results.values.all { it }
+        if (hasBlePermission) viewModel.rescan()
     }
 
     // 화면으로 되돌아오면 즉시 기존 연결을 끊고 다시 BLE 탐색을 시작한다 (ON_START 시점에 즉각 발동).
@@ -118,9 +127,15 @@ fun ScanScreen(
     var sawConnecting by remember { mutableStateOf(false) }
 
     LaunchedEffect(ui.bleState) {
-        when (ui.bleState) {
+        when (val s = ui.bleState) {
             is BleState.Connecting -> sawConnecting = true
             is BleState.Error, BleState.Disconnected -> {
+                // 연결 시도(요청했거나 Connecting 을 봤음)가 실패로 끝났으면 잠깐 안내한다.
+                if ((connectRequested || sawConnecting) && !ui.connected) {
+                    val msg = (s as? BleState.Error)?.message
+                        ?: context.getString(R.string.scan_connect_failed)
+                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                }
                 sawConnecting = false
                 connectRequested = false
             }
@@ -128,6 +143,9 @@ fun ScanScreen(
         }
     }
 
+    // 연결되면 STATUS 를 기다리지 않고 바로 넘어간다. STATUS 가 오기 전(프로토콜 불일치로 안 오는 경우 포함)에는
+    // 모니터 화면이 "의수 상태값을 기다리는 중" 로딩을 띄우고, STATUS 가 오면 값 표시로 바뀐다.
+    // DOF 불일치 안내는 메인 화면(MainActivity)이 맡는다.
     LaunchedEffect(ui.connected, connectRequested, sawConnecting) {
         if (ui.connected && (connectRequested || sawConnecting)) {
             connectRequested = false
@@ -156,7 +174,8 @@ fun ScanScreen(
             connectRequested = true
             viewModel.connect(device)
         },
-        onContinue = onConnected,
+        showMockToggle = BuildConfig.DEBUG,
+        onMockModeChange = viewModel::setMockMode,
     )
 }
 
@@ -168,13 +187,13 @@ private fun ScanContent(
     onOpenSettings: () -> Unit,
     onRescan: () -> Unit,
     onConnect: (BleDevice) -> Unit,
-    onContinue: () -> Unit,
     isConnected: Boolean = ui.connected,
+    showMockToggle: Boolean = false,
+    onMockModeChange: (Boolean) -> Unit = {},
 ) {
     val state = ui.bleState
     val isConnecting = state is BleState.Connecting
     val connectingAddress = (state as? BleState.Connecting)?.device?.address
-    val connectedAddress = if (isConnected) (state as? BleState.Connected)?.device?.address else null
     val errorMessage = (state as? BleState.Error)?.message
 
     // 연결 전에는 주기적으로 재스캔 → 새 기기/신호세기가 계속 갱신돼 "찾고 있는" 느낌.
@@ -194,15 +213,25 @@ private fun ScanContent(
             .padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // ── 타이틀 + 상태 문구 ──
+        // ── 타이틀 + 개발 모드 전환 + 상태 문구 ──
         item {
             Spacer(Modifier.height(20.dp))
-            Text(
-                text = stringResource(R.string.scan_title),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = Mark7Palette.Ink,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.scan_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Mark7Palette.Ink,
+                    modifier = Modifier.weight(1f),
+                )
+                if (showMockToggle) {
+                    MockModeToggle(enabled = ui.mockMode, onChange = onMockModeChange)
+                }
+            }
             Spacer(Modifier.height(4.dp))
             Text(
                 text = stringResource(
@@ -417,6 +446,92 @@ private fun PulsingCircle(
     }
 }
 
+/** 제목 오른쪽의 개발자 모드 진입 버튼. 사용자 모드 복귀에는 인증을 요구하지 않는다. */
+@Composable
+private fun MockModeToggle(
+    enabled: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    var showAuthDialog by remember { mutableStateOf(false) }
+    var pin by remember { mutableStateOf("") }
+    var invalidPin by remember { mutableStateOf(false) }
+
+    TextButton(
+        onClick = {
+            if (enabled) {
+                onChange(false)
+            } else {
+                pin = ""
+                invalidPin = false
+                showAuthDialog = true
+            }
+        },
+        modifier = Modifier.height(40.dp),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+    ) {
+        Text(
+            text = stringResource(if (enabled) R.string.scan_user_mode else R.string.scan_developer_mode),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            color = if (enabled) Mark7Palette.AccentDim else Mark7Palette.InkMuted,
+        )
+    }
+
+    if (showAuthDialog) {
+        AlertDialog(
+            onDismissRequest = { showAuthDialog = false },
+            title = { Text(stringResource(R.string.scan_developer_auth_title)) },
+            text = {
+                Column {
+                    Text(
+                        text = stringResource(R.string.scan_developer_auth_message),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = pin,
+                        onValueChange = { value ->
+                            pin = value.filter { it.isDigit() }.take(2)
+                            invalidPin = false
+                        },
+                        label = { Text(stringResource(R.string.scan_developer_auth_label)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        isError = invalidPin,
+                        supportingText = if (invalidPin) {
+                            { Text(stringResource(R.string.scan_developer_auth_error)) }
+                        } else null,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = pin.length == 2,
+                    onClick = {
+                        if (pin == DEVELOPER_MODE_PIN) {
+                            showAuthDialog = false
+                            onChange(true)
+                        } else {
+                            invalidPin = true
+                            pin = ""
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.scan_developer_auth_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAuthDialog = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
+}
+
+private const val DEVELOPER_MODE_PIN = "77"
+
 @Composable
 private fun DeviceCard(
     device: BleDevice,
@@ -487,7 +602,6 @@ private fun ScanPreviewScanning() {
             onOpenSettings = {},
             onRescan = {},
             onConnect = {},
-            onContinue = {},
         )
     }
 }
@@ -507,7 +621,6 @@ private fun ScanPreviewDevices() {
             onOpenSettings = {},
             onRescan = {},
             onConnect = {},
-            onContinue = {},
         )
     }
 }

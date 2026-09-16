@@ -24,12 +24,13 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // release 는 항상 실제 BLE. (연결 화면의 mock 스위치도 debug 빌드에만 보인다)
             buildConfigField("Boolean", "USE_MOCK_BLE", "false")
         }
         debug {
-            // 실기기 BLE 브링업 중 — mock 없이 실제 스캔/연결만 사용한다.
-            // (mock 이 필요하면 "true" → HybridHandRepository 가 mock+실제 스캔을 합쳐 노출)
-            buildConfigField("Boolean", "USE_MOCK_BLE", "false")
+            // 앱 시작 시 데이터 소스. true = BLE 끔 · mock 데이터 / false = 실제 BLE.
+            // 실행 중에는 연결 화면의 "개발용 Mock 데이터" 스위치로 다시 빌드 없이 바꿀 수 있다.
+            buildConfigField("Boolean", "USE_MOCK_BLE", "true")
         }
     }
 

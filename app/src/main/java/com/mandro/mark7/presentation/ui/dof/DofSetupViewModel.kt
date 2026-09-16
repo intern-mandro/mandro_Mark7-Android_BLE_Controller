@@ -3,7 +3,7 @@ package com.mandro.mark7.presentation.ui.dof
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mandro.mark7.data.local.HandVersionStore
-import com.mandro.mark7.domain.model.HandDof
+import com.mandro.mark7.domain.model.hand.HandDof
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow

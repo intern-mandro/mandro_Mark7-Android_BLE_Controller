@@ -1,14 +1,14 @@
 package com.mandro.mark7.domain.repository
 
-import com.mandro.mark7.domain.model.ActionMapping
-import com.mandro.mark7.domain.model.BleDevice
-import com.mandro.mark7.domain.model.BleState
-import com.mandro.mark7.domain.model.ConfigPushState
-import com.mandro.mark7.domain.model.HandConfig
-import com.mandro.mark7.domain.model.HandDof
-import com.mandro.mark7.domain.model.HandStatus
-import com.mandro.mark7.domain.model.ManualPreset
-import com.mandro.mark7.domain.model.MotorCommand
+import com.mandro.mark7.domain.model.hand.HandConfig
+import com.mandro.mark7.domain.model.hand.ManualPreset
+import com.mandro.mark7.domain.model.connection.BleDevice
+import com.mandro.mark7.domain.model.connection.BleState
+import com.mandro.mark7.domain.model.connection.ConfigPushState
+import com.mandro.mark7.domain.model.hand.MotorCommand
+import com.mandro.mark7.domain.model.action.ActionMapping
+import com.mandro.mark7.domain.model.hand.HandDof
+import com.mandro.mark7.domain.model.hand.HandStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.StateFlow
 interface HandRepository {
 
     /** 현재 선택된 의수 자유도 버전 (5 DOF, 6 DOF, 7 DOF) */
+    val selectedDof: StateFlow<HandDof>
+    val connectedDof: StateFlow<HandDof?>
     val activeDof: StateFlow<HandDof>
 
     // ── BLE 링크 ──────────────────────────────────────────────
@@ -46,6 +48,7 @@ interface HandRepository {
     // ── 액션(제스처) 매핑 (앱 로컬 전용) ─────────────────────────────
     val actionMapping: StateFlow<ActionMapping>
     suspend fun updateActionMapping(mapping: ActionMapping)
+    val syncedActionMapping: StateFlow<ActionMapping>
 
     // ── program_mode (MODE1/MODE2) 전환 ─────────────────────
     /**

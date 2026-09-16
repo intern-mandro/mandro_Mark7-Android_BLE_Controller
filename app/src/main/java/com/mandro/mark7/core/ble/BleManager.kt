@@ -18,12 +18,11 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.mandro.mark7.R
-import com.mandro.mark7.domain.model.BleDevice
-import com.mandro.mark7.domain.model.BleState
-import com.mandro.mark7.domain.model.HandStatus
-import com.mandro.mark7.domain.model.MARK7_NAME_PREFIX
+import com.mandro.mark7.domain.model.connection.BleDevice
+import com.mandro.mark7.domain.model.connection.BleState
+import com.mandro.mark7.domain.model.connection.MARK7_NAME_PREFIX
+import com.mandro.mark7.domain.model.hand.HandStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,11 +34,7 @@ import javax.inject.Singleton
 
 private const val TAG = "Mark7Ble"
 
-/**
- * 시리얼 브리지 후보 프로파일. Mark7 의수의 BLE 모듈은 Chipsen 제품 — HM-10(FFE0/FFE1)이
- * 아니라 대개 FFF0(+FFF1 notify / FFF2 write) 를 쓴다. 아래 후보로 먼저 찾고, 없으면
- * [onServicesDiscovered] 가 특성 속성(NOTIFY / WRITE)으로 자동 탐지한다.
- */
+// 시리얼 브릿지 후보 프로파일
 private val CANDIDATE_SERVICE_UUIDS = listOf(
     UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb"), // HM-10
     UUID.fromString("0000fff0-0000-1000-8000-00805f9b34fb"), // Chipsen / CC254x SPP
@@ -50,16 +45,10 @@ private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 private const val TX_CHUNK_SIZE = 12
 private const val TX_CHUNK_INTERVAL_MS = 20L
 
-/**
- * 재스캔 디바운스. 스캔 화면이 init + ON_START + 10초 루프 + 권한 콜백으로 startScan 을
- * 연달아 부르는데, Android 는 30초당 5회를 넘으면 스캔을 조용히 차단한다.
- */
+// 재스캔 디바운스
 private const val SCAN_DEBOUNCE_MS = 1_500L
 
-/**
- * 의수 BLE 저수준 관리자. 스캔 / 연결 / 프레임 송수신만 한다.
- * 프로토콜 인코딩·디코딩은 [MarkSevenProtocol], 상위 조립은 HandRepositoryImpl.
- */
+// 의수 BLE 저수준 관리자 (스캔 / 연결 / 프레임 송수신)
 @Singleton
 class BleManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -72,6 +61,9 @@ class BleManager @Inject constructor(
 
     private val _status = MutableSharedFlow<HandStatus>(extraBufferCapacity = 32)
     val status = _status.asSharedFlow()
+
+    private val dofDetector = ConnectedDofDetector()
+    val detectedDof = dofDetector.dof
 
     private val reassembler = FrameReassembler(
         onResync = { dropped -> Log.w(TAG, "RX resync — dropped $dropped stray byte(s) to realign STATUS stream") },
@@ -92,10 +84,6 @@ class BleManager @Inject constructor(
      * 디버그로 주변 모든 BLE 기기를 보고 싶으면 false 로.
      */
     var filterHandsOnly: Boolean = true
-
-    /** 마지막으로 보낸 SET 의 "SETok" 응답을 기다리는 쪽에 신호. */
-    @Volatile
-    private var pendingAck: CompletableDeferred<Unit>? = null
 
     // ── 권한 ──────────────────────────────────────────────────
     fun hasScan(): Boolean =
@@ -203,8 +191,7 @@ class BleManager @Inject constructor(
         writeChar = null
         notifyChar = null
         reassembler.reset()
-        pendingAck?.cancel()
-        pendingAck = null
+        dofDetector.reset()
         if (_state.value is BleState.Connected || _state.value is BleState.Connecting) {
             _state.value = BleState.Disconnected
         }
@@ -256,10 +243,6 @@ class BleManager @Inject constructor(
             g.writeCharacteristic(ch)
         }
     }
-
-    /** SET 전송 뒤 이 deferred 를 await 하면 "SETok" 수신 시 완료된다. */
-    fun awaitAck(): CompletableDeferred<Unit> =
-        CompletableDeferred<Unit>().also { pendingAck = it }
 
     // ── GATT 콜백 ─────────────────────────────────────────────
     private val gattCallback = object : android.bluetooth.BluetoothGattCallback() {
@@ -378,24 +361,19 @@ class BleManager @Inject constructor(
     }
 
     private fun handleRx(chunk: ByteArray) {
-        Log.d(TAG, "RX << ${chunk.joinToString(" ") { "%02X".format(it) }} (${chunk.size}B)")
+        Log.d(TAG, "RX << ${RxLog.hex(chunk)} (${chunk.size}B)")
         for (frame in reassembler.offer(chunk)) {
             when (frame) {
                 is FrameReassembler.Frame.Ack -> {
                     Log.d(TAG, "RX frame: SETok (ACK)")
-                    pendingAck?.complete(Unit)
-                    pendingAck = null
                 }
                 is FrameReassembler.Frame.Status -> {
                     val st = MarkSevenProtocol.parseStatus(frame.bytes)
-                    Log.d(
-                        TAG,
-                        "RX frame: STATUS 36B — " +
-                            if (st == null) "parse FAILED"
-                            else "temp=${st.motorTemp.toList()} curAvg=${st.motorCurrentAvg.toList()} " +
-                                "turn=${st.motorTurn.toList()} emg=${st.emg.toList()} chkOk=${st.checksumOk}",
-                    )
-                    st?.let { _status.tryEmit(it) }
+                    Log.d(TAG, RxLog.statusLine(frame.bytes, st))
+                    st?.let {
+                        dofDetector.update(it.dof)
+                        _status.tryEmit(it)
+                    }
                 }
             }
         }

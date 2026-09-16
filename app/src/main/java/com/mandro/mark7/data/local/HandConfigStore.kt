@@ -4,12 +4,13 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.mandro.mark7.domain.model.ActionMapping
-import com.mandro.mark7.domain.model.DEFAULT_STATE_GESTURES
-import com.mandro.mark7.domain.model.HandAction
-import com.mandro.mark7.domain.model.HandConfig
-import com.mandro.mark7.domain.model.HandDof
-import com.mandro.mark7.domain.model.ManualPreset
+import com.mandro.mark7.domain.model.hand.HandConfig
+import com.mandro.mark7.domain.model.hand.ManualPreset
+import com.mandro.mark7.domain.model.hand.CmdPresetCatalogs
+import com.mandro.mark7.domain.model.action.ActionMapping
+import com.mandro.mark7.domain.model.action.GestureCatalogs
+import com.mandro.mark7.domain.model.action.HandAction
+import com.mandro.mark7.domain.model.hand.HandDof
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -51,21 +52,27 @@ class HandConfigStore @Inject constructor(
 
     /**
      * 저장된 매핑이 있으면 그대로(비어 있어도 그대로 — 사용자가 전부 지운 상태를 존중),
-     * 아직 한 번도 저장한 적 없으면 [DEFAULT_STATE_GESTURES] 로 S2..S5 를 채운 초기값.
+     * 아직 한 번도 저장한 적 없으면 그 자유도 손 모양 목록의 기본값으로 S1..S8 을 채운 초기값.
+     * 매핑에는 자유도가 함께 실려, 액션 ID·Pair 규칙을 그 자유도 목록에서 계산한다.
      */
     val actionMapping: Flow<ActionMapping> =
         combine(handVersionStore.activeDof, dataStore.data) { dof, prefs ->
             prefs[mappingKey(dof.id)]
                 ?.let { runCatching { json.decodeFromString<StoredMapping>(it) }.getOrNull() }
-                ?.toDomain() ?: ActionMapping(gestureIdByState = DEFAULT_STATE_GESTURES)
+                ?.toDomain(dof)
+                ?: ActionMapping(gestureIdByState = GestureCatalogs.forDof(dof).defaultStateGestures, dof = dof)
         }.distinctUntilChanged()
 
-    val manualPresets: Flow<List<ManualPreset>> =
-        combine(handVersionStore.activeDof, dataStore.data) { dof, prefs ->
+    fun manualPresetsForDof(dofFlow: Flow<HandDof>): Flow<List<ManualPreset>> =
+        combine(dofFlow, dataStore.data) { dof, prefs ->
+            val defaults = CmdPresetCatalogs.forDof(dof)
             prefs[presetsKey(dof.id)]
                 ?.let { runCatching { json.decodeFromString<List<ManualPreset>>(it) }.getOrNull() }
-                ?: ManualPreset.DEFAULT_PRESETS
+                ?.let { CmdPresetCatalogs.normalizeSaved(it, dof) }
+                ?: defaults
         }.distinctUntilChanged()
+
+    val manualPresets: Flow<List<ManualPreset>> = manualPresetsForDof(handVersionStore.activeDof)
 
     suspend fun saveConfig(config: HandConfig) {
         val key = configKey(dofId())
@@ -77,45 +84,57 @@ class HandConfigStore @Inject constructor(
         dataStore.edit { it[key] = json.encodeToString(StoredMapping.fromDomain(mapping)) }
     }
 
-    suspend fun saveManualPresets(presets: List<ManualPreset>) {
-        val key = presetsKey(dofId())
+    suspend fun saveManualPresets(presets: List<ManualPreset>, dof: HandDof) {
+        val key = presetsKey(dof.id)
         dataStore.edit { it[key] = json.encodeToString(presets) }
     }
 
-    suspend fun resetManualPresets() {
-        val key = presetsKey(dofId())
+    suspend fun resetManualPresets(dof: HandDof) {
+        val key = presetsKey(dof.id)
         dataStore.edit { it.remove(key) }
-    }
-
-    /** 특정 자유도의 설정 키 제거 */
-    suspend fun deleteUserData(dofId: String) {
-        dataStore.edit {
-            it.remove(configKey(dofId))
-            it.remove(mappingKey(dofId))
-            it.remove(presetsKey(dofId))
-        }
     }
 
     @Serializable
     private data class StoredMapping(
+        val schemaVersion: Int = 1,
         val byAction: Map<String, Int> = emptyMap(),
         val byState: Map<String, String> = emptyMap(),
         val gradual: Boolean = false,
     ) {
-        fun toDomain() = ActionMapping(
+        fun toDomain(dof: HandDof) = ActionMapping(
             patternIndexByAction = byAction.mapNotNull { (k, v) ->
                 runCatching { HandAction.valueOf(k) }.getOrNull()?.let { it to v }
             }.toMap(),
-            gestureIdByState = byState.mapNotNull { (k, v) -> k.toIntOrNull()?.let { it to v } }.toMap(),
+            gestureIdByState = migrateStoredStateIds(byState, schemaVersion),
             gradualGraspEnabled = gradual,
+            dof = dof,
         )
 
         companion object {
             fun fromDomain(m: ActionMapping) = StoredMapping(
+                schemaVersion = CURRENT_MAPPING_SCHEMA_VERSION,
                 byAction = m.patternIndexByAction.mapKeys { it.key.name },
                 byState = m.gestureIdByState.mapKeys { it.key.toString() },
                 gradual = m.gradualGraspEnabled,
             )
         }
     }
+
+    private companion object {
+        const val CURRENT_MAPPING_SCHEMA_VERSION = 2
+    }
+}
+
+/** 기존 S1(IDLE)+S2..S9 저장값을 S0(IDLE)+S1..S8 체계로 한 칸 이동한다. */
+internal fun migrateStoredStateIds(
+    byState: Map<String, String>,
+    schemaVersion: Int,
+): Map<Int, String> {
+    val offset = if (schemaVersion < 2) -1 else 0
+    return byState.mapNotNull { (rawStateId, gestureId) ->
+        rawStateId.toIntOrNull()
+            ?.plus(offset)
+            ?.takeIf { it in 1..8 }
+            ?.let { it to gestureId }
+    }.toMap()
 }
