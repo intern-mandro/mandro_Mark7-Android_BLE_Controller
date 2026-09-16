@@ -3,22 +3,15 @@ package com.mandro.mark7.presentation.ui.manual
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -44,8 +37,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.zIndex
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -61,15 +52,12 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -89,7 +77,6 @@ import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -106,20 +93,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.withTimeout
 import kotlin.math.roundToInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mandro.mark7.R
-import com.mandro.mark7.domain.model.CmdDir
-import com.mandro.mark7.domain.model.HandDof
-import com.mandro.mark7.domain.model.HandStatus
-import com.mandro.mark7.domain.model.ManualPreset
+import com.mandro.mark7.domain.model.hand.ManualPreset
+import com.mandro.mark7.domain.model.hand.CmdPresetCatalogs
+import com.mandro.mark7.domain.model.hand.CmdDir
+import com.mandro.mark7.domain.model.hand.HandDof
 import com.mandro.mark7.presentation.components.Mark7Slider
 import com.mandro.mark7.presentation.components.ResetConfirmDialog
 import com.mandro.mark7.presentation.components.SliderInterval
@@ -172,13 +156,15 @@ fun ManualScreen(
                 val msg = when (dir) {
                     CmdDir.GRASP -> context.getString(R.string.manual_feedback_grasp, summary)
                     CmdDir.RELEASE -> context.getString(R.string.manual_feedback_release, summary)
+                    CmdDir.RESET_COUNTER -> context.getString(R.string.manual_feedback_reset_counter)
+                    CmdDir.RESET_POWER -> context.getString(R.string.manual_feedback_reset_power)
                     else -> ""
                 }
                 if (msg.isNotEmpty()) showFastToast(msg)
             },
             onExecutePreset = { preset ->
                 val executed = viewModel.executePreset(preset)
-                val name = getPresetDisplayName(preset, context)
+                val name = getPresetDisplayName(preset, ui.dof)
                 if (executed) {
                     val dirLabel = context.getString(
                         if (preset.direction == CmdDir.RELEASE) R.string.manual_release_title
@@ -195,7 +181,7 @@ fun ManualScreen(
             onUpdatePreset = viewModel::updatePreset,
             onDeletePreset = { id ->
                 val targetPreset = presets.firstOrNull { it.id == id }
-                val name = targetPreset?.let { getPresetDisplayName(it, context) } ?: ""
+                val name = targetPreset?.let { getPresetDisplayName(it, ui.dof) } ?: ""
                 PresetImageStore.deleteIfOwned(context, targetPreset?.imageUri)
                 viewModel.deletePreset(id)
                 if (name.isNotEmpty()) {
@@ -271,6 +257,8 @@ private fun ManualContent(
     var editingPreset by remember { mutableStateOf<ManualPreset?>(null) }
     // 상단 "삭제" 버튼 → 확인 다이얼로그 대상
     var pendingDeletePreset by remember { mutableStateOf<ManualPreset?>(null) }
+    // 카운터/전원 초기화 → 전송 전 확인 다이얼로그 대상
+    var pendingReset by remember { mutableStateOf<CmdDir?>(null) }
 
     val currentOnExecutePreset by rememberUpdatedState(onExecutePreset)
     val currentIsExecuting by rememberUpdatedState(isExecuting)
@@ -417,9 +405,9 @@ private fun ManualContent(
 
                 val graspBgColor by animateColorAsState(
                     targetValue = when {
-                        graspHi -> Mark7Palette.Grasp
+                        graspHi -> Mark7Palette.GraspSoft
                         !graspEnabled -> Mark7Palette.SurfaceAlt.copy(alpha = 0.45f)
-                        else -> Mark7Palette.SurfaceAlt
+                        else -> Mark7Palette.Surface
                     },
                     animationSpec = tween(80),
                     label = "graspBg",
@@ -435,7 +423,7 @@ private fun ManualContent(
                 )
                 val graspTextColor by animateColorAsState(
                     targetValue = when {
-                        graspHi -> Color.White
+                        graspHi -> Mark7Palette.Grasp
                         !graspEnabled -> Mark7Palette.InkMuted.copy(alpha = 0.4f)
                         else -> Mark7Palette.Ink
                     },
@@ -445,9 +433,9 @@ private fun ManualContent(
 
                 val releaseBgColor by animateColorAsState(
                     targetValue = when {
-                        releaseHi -> Mark7Palette.Release
+                        releaseHi -> Mark7Palette.ReleaseSoft
                         !releaseEnabled -> Mark7Palette.SurfaceAlt.copy(alpha = 0.45f)
-                        else -> Mark7Palette.SurfaceAlt
+                        else -> Mark7Palette.Surface
                     },
                     animationSpec = tween(80),
                     label = "releaseBg",
@@ -463,7 +451,7 @@ private fun ManualContent(
                 )
                 val releaseTextColor by animateColorAsState(
                     targetValue = when {
-                        releaseHi -> Color.White
+                        releaseHi -> Mark7Palette.ReleaseTextStrong
                         !releaseEnabled -> Mark7Palette.InkMuted.copy(alpha = 0.4f)
                         else -> Mark7Palette.Ink
                     },
@@ -683,7 +671,8 @@ private fun ManualContent(
                             } else {
                                 CompactPresetChip(
                                     preset = preset,
-                                    displayName = getPresetDisplayName(preset, context),
+                                    dof = ui.dof,
+                                    displayName = getPresetDisplayName(preset, ui.dof),
                                     isSelected = ui.lastExecutedPresetId == preset.id,
                                     modifier = Modifier.fillMaxSize(),
                                 )
@@ -703,7 +692,8 @@ private fun ManualContent(
 
                     CompactPresetChip(
                         preset = draggedPreset,
-                        displayName = getPresetDisplayName(draggedPreset, context),
+                        dof = ui.dof,
+                        displayName = getPresetDisplayName(draggedPreset, ui.dof),
                         isSelected = true,
                         isBeingDragged = true,
                         modifier = Modifier
@@ -742,6 +732,50 @@ private fun ManualContent(
             },
         )
 
+        // 유지보수 — 카운터/전원 초기화 (버튼 형태)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedButton(
+                onClick = { pendingReset = CmdDir.RESET_COUNTER },
+                modifier = Modifier.height(32.dp),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, Mark7Palette.Danger),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = Mark7Palette.Danger,
+                ),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.manual_reset_counter),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            OutlinedButton(
+                onClick = { pendingReset = CmdDir.RESET_POWER },
+                modifier = Modifier.height(32.dp),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, Mark7Palette.Danger),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = Mark7Palette.Danger,
+                ),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.manual_reset_power),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+
     }
 
     // ── 새 동작 만들기 다이얼로그 ──
@@ -761,7 +795,7 @@ private fun ManualContent(
         EditPresetDialog(
             dof = ui.dof,
             preset = preset,
-            displayName = getPresetDisplayName(preset, context),
+            displayName = getPresetDisplayName(preset, ui.dof),
             onDismiss = { editingPreset = null },
             onSave = { updated ->
                 onUpdatePreset(updated)
@@ -776,7 +810,7 @@ private fun ManualContent(
 
     // ── 동작 삭제 확인 다이얼로그 (상단 "삭제" 버튼) ──
     pendingDeletePreset?.let { preset ->
-        val name = getPresetDisplayName(preset, context)
+        val name = getPresetDisplayName(preset, ui.dof)
         AlertDialog(
             onDismissRequest = { pendingDeletePreset = null },
             containerColor = Mark7Palette.Surface,
@@ -798,6 +832,18 @@ private fun ManualContent(
                     Text(stringResource(R.string.manual_cancel))
                 }
             },
+        )
+    }
+
+    // ── 카운터/전원 초기화 전송 확인 다이얼로그 ──
+    pendingReset?.let { dir ->
+        ResetConfirmDialog(
+            onConfirm = { onSend(dir) },
+            onDismiss = { pendingReset = null },
+            message = stringResource(
+                if (dir == CmdDir.RESET_COUNTER) R.string.manual_reset_counter_confirm_msg
+                else R.string.manual_reset_power_confirm_msg,
+            ),
         )
     }
 
@@ -1091,11 +1137,16 @@ private fun computeGapAndRow(
 @Composable
 private fun CompactPresetChip(
     preset: ManualPreset,
+    dof: HandDof,
     displayName: String,
     isSelected: Boolean = false,
     isBeingDragged: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val imageUri = remember(context, dof, preset.id, preset.isDefault, preset.imageUri) {
+        PresetImageStore.imageFor(context, preset, dof)
+    }
     val isRelease = preset.direction == CmdDir.RELEASE
     val accentColor = if (isRelease) Mark7Palette.Release else Mark7Palette.Grasp
     val softColor = if (isRelease) Mark7Palette.ReleaseSoft else Mark7Palette.GraspSoft
@@ -1135,12 +1186,12 @@ private fun CompactPresetChip(
                     .fillMaxWidth()
                     .weight(1f)
                     .clip(RoundedCornerShape(7.dp))
-                    .background(Mark7Palette.SurfaceAlt),
+                    .background(Color.White),
                 contentAlignment = Alignment.Center,
             ) {
-                if (preset.imageUri != null) {
+                if (imageUri != null) {
                     PresetPhoto(
-                        imageUri = preset.imageUri,
+                        imageUri = imageUri,
                         biasX = preset.imageBiasX,
                         biasY = preset.imageBiasY,
                         modifier = Modifier.fillMaxSize(),
@@ -1168,28 +1219,26 @@ private fun CompactPresetChip(
 private const val PRESET_PHOTO_ASPECT = 1.6f
 
 /**
- * 프리셋 사진을 프레임에 꽉 채워 자르고([ContentScale.Crop]) [biasX]·[biasY] 로
- * 어느 부분이 보일지 정한다. 기본값(0f, 0f)이면 가운데 = 예전과 동일.
+ * 프리셋 사진을 프레임 전체에 맞추어([ContentScale.Fit]) 전체가 온전히 보이도록 표시한다.
  */
 @Composable
 private fun PresetPhoto(
     imageUri: String,
-    biasX: Float,
-    biasY: Float,
+    biasX: Float = 0f,
+    biasY: Float = 0f,
     modifier: Modifier = Modifier,
 ) {
     AsyncImage(
         model = imageUri,
         contentDescription = null,
-        contentScale = ContentScale.Crop,
-        alignment = BiasAlignment(biasX.coerceIn(-1f, 1f), biasY.coerceIn(-1f, 1f)),
+        contentScale = ContentScale.Fit,
+        alignment = Alignment.Center,
         modifier = modifier,
     )
 }
 
 /**
- * 칩과 같은 크기·비율의 고정 프레임. 확대/축소 없이 드래그로 "어느 부분이 잘려 보일지"만 바꾼다.
- * 사진이 프레임보다 넘치는 축(세로로 길면 상하 / 가로로 길면 좌우)으로만 이동된다.
+ * 칩과 같은 크기·비율의 프레임에서 사진 전체를 미리보기한다. 배경은 흰색.
  */
 @Composable
 private fun PhotoAdjuster(
@@ -1199,24 +1248,12 @@ private fun PhotoAdjuster(
     onChange: (biasX: Float, biasY: Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val cur = rememberUpdatedState(biasX to biasY) // stale capture 방지
     Box(
         modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Mark7Palette.SurfaceAlt)
-            .border(1.dp, Mark7Palette.Line, RoundedCornerShape(8.dp))
-            .pointerInput(Unit) {
-                detectDragGestures { change, drag ->
-                    change.consume()
-                    val (x0, y0) = cur.value
-                    val vw = size.width.toFloat().coerceAtLeast(1f)
-                    val vh = size.height.toFloat().coerceAtLeast(1f)
-                    onChange(
-                        (x0 - drag.x / vw * 2f).coerceIn(-1f, 1f),
-                        (y0 - drag.y / vh * 2f).coerceIn(-1f, 1f),
-                    )
-                }
-            },
+            .background(Color.White)
+            .border(1.dp, Mark7Palette.Line, RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center,
     ) {
         PresetPhoto(imageUri, biasX, biasY, Modifier.fillMaxSize())
     }
@@ -1338,8 +1375,7 @@ private val RECOMMENDED_PRESET_EMOJIS = listOf(
     "🤘", // 락앤롤 (검지, 소지)
     "🤙", // 샤카 (엄지, 소지)
     "🤟", // 사랑해 (엄지, 검지, 소지)
-    "🖖", // 발칸 (4개 손가락 펼침)
-    "🖐", // 전체 펴기 (손가락 벌림)
+    // 🖖(발칸) · 🖐(손가락 벌린 손)은 손가락 외전이 필요해 하드웨어로 불가 — 제외
     "✋", // 전체 펴기 (손가락 모음)
     "🤏", // 집기 (pick / pinch)
     "🖕", // 중지
@@ -1443,12 +1479,12 @@ private fun CreatePresetDialog(
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { direction = CmdDir.GRASP },
                             shape = RoundedCornerShape(8.dp),
-                            color = if (direction == CmdDir.GRASP) Mark7Palette.Grasp else Mark7Palette.SurfaceAlt,
+                            color = if (direction == CmdDir.GRASP) Mark7Palette.GraspSoft else Mark7Palette.Surface,
                             border = if (direction == CmdDir.GRASP) BorderStroke(2.dp, Mark7Palette.GraspBorder) else BorderStroke(1.dp, Mark7Palette.Line),
                         ) {
                             Text(
                                 text = "✊ " + stringResource(R.string.manual_grasp_title),
-                                color = if (direction == CmdDir.GRASP) Color.White else Mark7Palette.Ink,
+                                color = if (direction == CmdDir.GRASP) Mark7Palette.Grasp else Mark7Palette.Ink,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(vertical = 8.dp),
@@ -1460,12 +1496,12 @@ private fun CreatePresetDialog(
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { direction = CmdDir.RELEASE },
                             shape = RoundedCornerShape(8.dp),
-                            color = if (direction == CmdDir.RELEASE) Mark7Palette.Release else Mark7Palette.SurfaceAlt,
+                            color = if (direction == CmdDir.RELEASE) Mark7Palette.ReleaseSoft else Mark7Palette.Surface,
                             border = if (direction == CmdDir.RELEASE) BorderStroke(2.dp, Mark7Palette.ReleaseBorder) else BorderStroke(1.dp, Mark7Palette.Line),
                         ) {
                             Text(
                                 text = "🖐 " + stringResource(R.string.manual_release_title),
-                                color = if (direction == CmdDir.RELEASE) Color.White else Mark7Palette.Ink,
+                                color = if (direction == CmdDir.RELEASE) Mark7Palette.Release else Mark7Palette.Ink,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(vertical = 8.dp),
@@ -1666,12 +1702,12 @@ private fun EditPresetDialog(
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { direction = CmdDir.GRASP },
                             shape = RoundedCornerShape(8.dp),
-                            color = if (direction == CmdDir.GRASP) Mark7Palette.Grasp else Mark7Palette.SurfaceAlt,
+                            color = if (direction == CmdDir.GRASP) Mark7Palette.GraspSoft else Mark7Palette.Surface,
                             border = if (direction == CmdDir.GRASP) BorderStroke(2.dp, Mark7Palette.GraspBorder) else BorderStroke(1.dp, Mark7Palette.Line),
                         ) {
                             Text(
                                 text = "✊ " + stringResource(R.string.manual_grasp_title),
-                                color = if (direction == CmdDir.GRASP) Color.White else Mark7Palette.Ink,
+                                color = if (direction == CmdDir.GRASP) Mark7Palette.Grasp else Mark7Palette.Ink,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(vertical = 8.dp),
@@ -1683,12 +1719,12 @@ private fun EditPresetDialog(
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { direction = CmdDir.RELEASE },
                             shape = RoundedCornerShape(8.dp),
-                            color = if (direction == CmdDir.RELEASE) Mark7Palette.Release else Mark7Palette.SurfaceAlt,
+                            color = if (direction == CmdDir.RELEASE) Mark7Palette.ReleaseSoft else Mark7Palette.Surface,
                             border = if (direction == CmdDir.RELEASE) BorderStroke(2.dp, Mark7Palette.ReleaseBorder) else BorderStroke(1.dp, Mark7Palette.Line),
                         ) {
                             Text(
                                 text = "🖐 " + stringResource(R.string.manual_release_title),
-                                color = if (direction == CmdDir.RELEASE) Color.White else Mark7Palette.Ink,
+                                color = if (direction == CmdDir.RELEASE) Mark7Palette.Release else Mark7Palette.Ink,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(vertical = 8.dp),
@@ -1804,17 +1840,9 @@ private fun FingerMiniChip(
     }
 }
 
-private fun getPresetDisplayName(preset: ManualPreset, context: Context): String {
+private fun getPresetDisplayName(preset: ManualPreset, dof: HandDof): String {
     if (!preset.isDefault) return preset.name
-    return when (preset.id) {
-        "fist" -> context.getString(R.string.manual_preset_fist)
-        "point" -> context.getString(R.string.manual_preset_point)
-        "pinch" -> context.getString(R.string.manual_preset_pinch)
-        "peace" -> context.getString(R.string.manual_preset_peace)
-        "tripod" -> context.getString(R.string.manual_preset_tripod)
-        "open" -> context.getString(R.string.manual_preset_open)
-        else -> preset.name
-    }
+    return CmdPresetCatalogs.forDof(dof).firstOrNull { it.id == preset.id }?.name ?: preset.name
 }
 
 @Composable
@@ -1832,7 +1860,7 @@ private fun FingerSelectChip(
         label = "fingerBg",
     )
     val borderColor by animateColorAsState(
-        targetValue = if (selected) Mark7Palette.AccentDim else Mark7Palette.Line,
+        targetValue = if (selected) Mark7Palette.Accent else Mark7Palette.Line,
         animationSpec = tween(150),
         label = "fingerBorder",
     )

@@ -63,13 +63,14 @@ app/src/main/java/com/mandro/mark7/
         ├── manual/             직접 구동 (CMD: GRASP/RELEASE/STOP/RESET)
         ├── action/             ★ 액션→패턴 매핑 (사진 선택) + 점진적 잡기 토글
         │   ├── ActionScreen.kt · PatternPickerScreen.kt
-        │   └── GestureAssets.kt   assets/gesture_guides/<action>/*.jpg 로더
+        │   └── GestureAssets.kt   assets/<N>dof_gesture_guides/<ID>_<id>.png 로더
         └── settings/           SET 프레임 편집·전송 (전류/위치/속도/SL/EMG)
 ```
 
-`assets/gesture_guides/{flexion,extension,close,rest}/fNN.jpg` — 현재는
-`mandro-dynamic-gesture`의 가이드 이미지를 임시로 복사해 둔 상태.
-실제 "패턴별 손 모양 사진"으로 교체 예정.
+`assets/{5,6,7}dof_gesture_guides/<액션 ID 두 자리>_<손 모양 id>.png` — 자유도별 손 모양 사진
+(예: `6dof_gesture_guides/01_cylinder_grip_open.png`). 0번은 대기 손 모양 `00_flat_hand.png` 로 고정.
+파일명은 `domain/model/GestureCatalogs.kt` 목록 순서(액션 ID)와 맞아야 하며
+`GestureAssetFilesTest` 가 검사한다.
 
 ---
 

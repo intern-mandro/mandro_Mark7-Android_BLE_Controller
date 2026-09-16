@@ -1,22 +1,21 @@
 package com.mandro.mark7.presentation.ui.manual
 
-import com.mandro.mark7.domain.model.ActionMapping
-import com.mandro.mark7.domain.model.BleDevice
-import com.mandro.mark7.domain.model.BleState
-import com.mandro.mark7.domain.model.CmdDir
-import com.mandro.mark7.domain.model.ConfigPushState
-import com.mandro.mark7.domain.model.HandConfig
-import com.mandro.mark7.domain.model.HandDof
-import com.mandro.mark7.domain.model.HandStatus
-import com.mandro.mark7.domain.model.ManualPreset
-import com.mandro.mark7.domain.model.MotorCommand
+import com.mandro.mark7.domain.model.hand.HandConfig
+import com.mandro.mark7.domain.model.hand.ManualPreset
+import com.mandro.mark7.domain.model.connection.BleDevice
+import com.mandro.mark7.domain.model.connection.BleState
+import com.mandro.mark7.domain.model.connection.ConfigPushState
+import com.mandro.mark7.domain.model.hand.CmdDir
+import com.mandro.mark7.domain.model.hand.MotorCommand
+import com.mandro.mark7.domain.model.action.ActionMapping
+import com.mandro.mark7.domain.model.hand.HandDof
+import com.mandro.mark7.domain.model.hand.HandStatus
 import com.mandro.mark7.domain.repository.HandRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
@@ -37,7 +36,9 @@ class ManualViewModelTest {
 
     private class FakeHandRepository : HandRepository {
         val sentCommands = mutableListOf<MotorCommand>()
-        override val activeDof: StateFlow<HandDof> = MutableStateFlow(HandDof.DEFAULT)
+        override val selectedDof: StateFlow<HandDof> = MutableStateFlow(HandDof.DEFAULT)
+        override val connectedDof: StateFlow<HandDof?> = MutableStateFlow(null)
+        override val activeDof: StateFlow<HandDof> = selectedDof
         override val bleState: Flow<BleState> = kotlinx.coroutines.flow.emptyFlow()
         override val status: Flow<HandStatus> = kotlinx.coroutines.flow.emptyFlow()
         override val configPushState: Flow<ConfigPushState> = kotlinx.coroutines.flow.emptyFlow()
@@ -52,6 +53,7 @@ class ManualViewModelTest {
         override suspend fun updateConfig(config: HandConfig) {}
         override suspend fun pushConfig(config: HandConfig?): Result<Unit> = Result.success(Unit)
         override val actionMapping: StateFlow<ActionMapping> = MutableStateFlow(ActionMapping())
+        override val syncedActionMapping: StateFlow<ActionMapping> = actionMapping
         override suspend fun updateActionMapping(mapping: ActionMapping) {}
         override suspend fun setProgramMode(mode: Int): Result<Unit> = Result.success(Unit)
         override val manualPresets: StateFlow<List<ManualPreset>> = MutableStateFlow(emptyList())

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -59,7 +58,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -75,11 +73,14 @@ import com.mandro.mark7.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.mandro.mark7.domain.model.ActionMapping
-import com.mandro.mark7.domain.model.Gesture
-import com.mandro.mark7.domain.model.ModeFlowGraph
-import com.mandro.mark7.domain.model.ModeInput
-import com.mandro.mark7.domain.model.ModeState
+import com.mandro.mark7.domain.model.action.ActionMapping
+import com.mandro.mark7.domain.model.action.ActionSlotMode
+import com.mandro.mark7.domain.model.action.Gesture
+import com.mandro.mark7.domain.model.action.GestureCatalog
+import com.mandro.mark7.domain.model.action.ModeFlowGraph
+import com.mandro.mark7.domain.model.action.ModeInput
+import com.mandro.mark7.domain.model.action.ModeState
+import com.mandro.mark7.presentation.components.ResetConfirmDialog
 import com.mandro.mark7.presentation.theme.Mark7Palette
 import com.mandro.mark7.presentation.theme.Mark7Theme
 
@@ -93,17 +94,25 @@ import com.mandro.mark7.presentation.theme.Mark7Theme
 @Composable
 fun ModeFlowScreen(
     onPickGesture: (Int) -> Unit,
+    notice: String? = null,
+    onConsumeNotice: () -> Unit = {},
     viewModel: ActionViewModel = hiltViewModel(),
 ) {
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    // SET 전송 결과는 화면 상단(앱바 바로 아래)에 배너로 띄운다 — 안드로이드 기본 토스트는
+    // SET 전송 결과 및 손 선택 반영 안내는 화면 상단(앱바 바로 아래)에 배너로 띄운다 — 안드로이드 기본 토스트는
     // 하단 SET 버튼/네비바와 겹쳐 안 보였음.
     var banner by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         viewModel.pushResult.collect { ok ->
             banner = context.getString(if (ok) R.string.mode_send_done else R.string.mode_send_failed)
+        }
+    }
+    LaunchedEffect(notice) {
+        if (notice != null) {
+            banner = notice
+            onConsumeNotice()
         }
     }
     LaunchedEffect(banner) {
@@ -150,29 +159,11 @@ fun ModeFlowScreen(
     }
 
     if (showClearAll) {
-        AlertDialog(
-            onDismissRequest = { showClearAll = false },
-            containerColor = Mark7Palette.Surface,
-            tonalElevation = 0.dp,
-            title = {
-                Text(
-                    text = stringResource(R.string.mode_clear_all_title),
-                    fontWeight = FontWeight.Bold,
-                    color = Mark7Palette.Ink,
-                )
-            },
-            text = { Text(stringResource(R.string.mode_clear_all_msg), style = MaterialTheme.typography.bodyMedium) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showClearAll = false
-                    viewModel.clearAllGestures()
-                }) {
-                    Text(stringResource(R.string.mode_clear_confirm), fontWeight = FontWeight.Bold, color = Mark7Palette.Danger)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearAll = false }) { Text(stringResource(R.string.common_cancel)) }
-            },
+        ResetConfirmDialog(
+            title = stringResource(R.string.mode_clear_all_title),
+            message = stringResource(R.string.mode_clear_all_msg),
+            onConfirm = { viewModel.resetToDefault() },
+            onDismiss = { showClearAll = false },
         )
     }
 }
@@ -188,58 +179,68 @@ private fun ModeFlowContent(
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .background(Mark7Palette.Bg),
     ) {
-        // ─── 모드 1 (상단) ───
-        ModeHeader(
-            title = stringResource(R.string.mode_1_title),
-        )
-        FlowDiagram(
-            graph = ModeFlowGraph.MODE_1,
-            mapping = mapping,
-            onPickGesture = onPickGesture,
-        )
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            // ─── 모드 1 (상단) ───
+            ModeHeader(
+                title = stringResource(R.string.mode_1_title),
+            )
+            FlowDiagram(
+                graph = ModeFlowGraph.MODE_1,
+                mapping = mapping,
+                onPickGesture = onPickGesture,
+            )
 
-        ModeSwitchIndicator()
+            ModeSwitchIndicator()
 
-        // ─── 모드 2 (하단, 같은 형태) ───
-        ModeHeader(
-            title = stringResource(R.string.mode_2_title),
-        )
-        FlowDiagram(
-            graph = ModeFlowGraph.MODE_2,
-            mapping = mapping,
-            onPickGesture = onPickGesture,
-        )
+            // ─── 모드 2 (하단, 같은 형태) ───
+            ModeHeader(
+                title = stringResource(R.string.mode_2_title),
+            )
+            FlowDiagram(
+                graph = ModeFlowGraph.MODE_2,
+                mapping = mapping,
+                onPickGesture = onPickGesture,
+            )
 
-        Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(8.dp))
+        }
 
-        // [All Clear] [의수에 적용] — 다른 탭의 [기본값][적용] 버튼 줄과 동일 스타일
+        // [All Clear] [의수에 적용] — 다른 탭의 [기본값][적용] 버튼 줄과 동일 스타일 (화면 하단 고정)
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             OutlinedButton(
                 onClick = onClearAll,
+                enabled = !pushing,
                 modifier = Modifier.height(36.dp),
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Mark7Palette.Danger),
             ) {
                 Text(
                     text = stringResource(R.string.mode_clear_all),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Mark7Palette.Danger,
                 )
             }
+            // 전송 중에도 비활성화하지 않는다 — 언제든 다시 보낼 수 있다.
             Button(
                 onClick = onPush,
-                enabled = !pushing,
-                colors = ButtonDefaults.buttonColors(containerColor = Mark7Palette.Accent),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Mark7Palette.Accent,
+                    contentColor = Color.White,
+                ),
                 modifier = Modifier
                     .weight(1f)
                     .height(36.dp),
@@ -381,7 +382,7 @@ private fun FlowDiagram(
                 val colWidth = 86.dp * nodeScale
                 val x0 = 42.dp * nodeScale
                 val x2 = totalW - x0
-                // S1과 S2 사이의 간격을 안정적으로 확보하여 완만한 곡선 및 충분한 여백 제공
+                // S0과 첫 액션 노드 사이의 간격을 안정적으로 확보하여 완만한 곡선 및 충분한 여백 제공
                 val x1 = x0 + (x2 - x0) * 0.48f
 
                 val yTop = 54.dp * nodeScale
@@ -390,7 +391,7 @@ private fun FlowDiagram(
 
                 val trackGapDp = 7.dp
 
-              Box(Modifier.fillMaxWidth().height(236.dp * nodeScale)) {
+              Box(Modifier.fillMaxWidth().height(248.dp * nodeScale)) {
             // ─── 1. 화살표 및 연결선 캔버스 ───
             Canvas(Modifier.fillMaxSize()) {
                 val x0Px = x0.toPx()
@@ -409,11 +410,6 @@ private fun FlowDiagram(
                 val tipInset = 5.dp.toPx()
                 val trackGap = trackGapDp.toPx()
 
-                val x0Right = x0Px + rPx
-                val x1Left = x1Px - rPx
-                val x1Right = x1Px + rPx
-                val x2Left = x2Px - rPx
-
                 fun circleRightX(cx: Float, cy: Float, r: Float, y: Float): Float {
                     val dy = (y - cy).coerceIn(-r * 0.99f, r * 0.99f)
                     return cx + kotlin.math.sqrt(r * r - dy * dy)
@@ -424,7 +420,7 @@ private fun FlowDiagram(
                     return cx - kotlin.math.sqrt(r * r - dy * dy)
                 }
 
-                // ─── 수평 화살표: 상단 (S2 ⇄ S3) ───
+                // ─── 수평 화살표: 상단 첫 번째 액션 Pair ───
                 val yTopFwd = yTopPx - trackGap // 위: 오른쪽 진행 (Flexion)
                 val s2R_fwd = circleRightX(x1Px, yTopPx, rPx, yTopFwd) + tipInset
                 val s3L_fwd = circleLeftX(x2Px, yTopPx, rPx, yTopFwd) - tipInset
@@ -449,7 +445,7 @@ private fun FlowDiagram(
                 )
                 drawArrowHead(tip = Offset(s2R_bwd, yTopBwd), headW = headW, headH = headH, color = ExtensionColor, pointsRight = false)
 
-                // ─── 수평 화살표: 하단 (S4 ⇄ S5: 상단과 동일하게 위: 진행 Flexion, 아래: 복귀 Extension) ───
+                // ─── 수평 화살표: 하단 두 번째 액션 Pair ───
                 val yBtmFwd = yBtmPx - trackGap // 위: 오른쪽 진행 (Flexion)
                 val s4R_fwd = circleRightX(x1Px, yBtmPx, rPx, yBtmFwd) + tipInset
                 val s5L_fwd = circleLeftX(x2Px, yBtmPx, rPx, yBtmFwd) - tipInset
@@ -502,8 +498,8 @@ private fun FlowDiagram(
                     drawArrowHeadDir(bA, Offset(-d.x, -d.y), headW, bwdColor)
                 }
 
-                drawBranchPair(yTopPx, FlexionColor, ExtensionColor)   // IDLE ⇄ S2
-                drawBranchPair(yBtmPx, ExtensionColor, ExtensionColor) // IDLE ⇄ S4
+                drawBranchPair(yTopPx, FlexionColor, ExtensionColor)   // IDLE ⇄ 첫 번째 Pair
+                drawBranchPair(yBtmPx, ExtensionColor, ExtensionColor) // IDLE ⇄ 두 번째 Pair
             }
 
             // ─── 2. 텍스트 라벨: 각 라벨을 자기 화살표선 기준으로 개별 배치 ───
@@ -574,10 +570,10 @@ private fun FlowDiagram(
                         .graphicsLayer { rotationZ = angle },
                 )
             }
-            // IDLE ⇄ S2: 진행(위) = Flexion, 복귀(아래) = Extension
+            // IDLE ⇄ 상단 Pair: 진행(위) = Flexion, 복귀(아래) = Extension
             BranchLabel("Flexion", FlexionColor, yTop, sign = -1f)
             BranchLabel("Extension", ExtensionColor, yTop, sign = 1f)
-            // IDLE ⇄ S4: 진행·복귀 둘 다 Extension
+            // IDLE ⇄ 하단 Pair: 진행·복귀 둘 다 Extension
             BranchLabel("Extension", ExtensionColor, yBtm, sign = -1f)
             BranchLabel("Extension", ExtensionColor, yBtm, sign = 1f)
 
@@ -594,28 +590,28 @@ private fun FlowDiagram(
                 NodeColumn(idle, mapping, onPickGesture, bubbleSize, colWidth)
             }
 
-            // S2 (상단 중앙)
+            // 상단 Pair 앞 노드
             Box(
                 Modifier.offset(x = x1 - halfCol, y = yTop - nodeRadius),
             ) {
                 NodeColumn(sTop1, mapping, onPickGesture, bubbleSize, colWidth)
             }
 
-            // S3 (상단 우측)
+            // 상단 Pair 뒤 노드
             Box(
                 Modifier.offset(x = x2 - halfCol, y = yTop - nodeRadius),
             ) {
                 NodeColumn(sTop2, mapping, onPickGesture, bubbleSize, colWidth)
             }
 
-            // S4 (하단 중앙)
+            // 하단 Pair 앞 노드
             Box(
                 Modifier.offset(x = x1 - halfCol, y = yBtm - nodeRadius),
             ) {
                 NodeColumn(sBottom1, mapping, onPickGesture, bubbleSize, colWidth)
             }
 
-            // S5 (하단 우측)
+            // 하단 Pair 뒤 노드
             Box(
                 Modifier.offset(x = x2 - halfCol, y = yBtm - nodeRadius),
             ) {
@@ -684,29 +680,44 @@ private fun NodeColumn(
     bubbleSize: Dp = NODE_SIZE,
     columnWidth: Dp = 86.dp,
 ) {
+    val slotMode = mapping.slotModeFor(state.id)
     val gesture = gestureFor(state, mapping)
-    val assigned = state.fixed || mapping.gestureIdFor(state.id) != null
+    val assigned = state.fixed || gesture != null
+    val disabled = !state.fixed && slotMode == ActionSlotMode.DISABLED
+    val label = if (disabled) {
+        stringResource(R.string.mode_node_disabled)
+    } else {
+        gestureLabel(gesture)
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(1.dp),
         modifier = Modifier.width(columnWidth),
     ) {
-        // 노드를 누르면(짧게/길게 상관없이) 무조건 액션 선택 화면으로. 예외 없음.
+        // 앞 노드와 Pair 로 채워진 뒤 노드는 눌러서 묶음 전체를 다시 고른다. 비활성 뒤 노드는 누를 수 없다.
         NodeBubble(
             state = state,
             gesture = gesture,
+            catalog = mapping.catalog,
+            disabled = disabled,
             size = bubbleSize,
-            onClick = if (state.fixed) null else ({ onPickGesture(state.id) }),
+            onClick = if (state.fixed || !slotMode.opensPicker) {
+                null
+            } else {
+                { onPickGesture(state.id) }
+            },
         )
         Text(
-            text = if (state.fixed) stringResource(R.string.gesture_idle) else gestureLabel(gesture),
+            text = label,
             fontSize = 9.5.sp,
+            lineHeight = 11.5.sp,
             fontWeight = if (assigned) FontWeight.SemiBold else FontWeight.Normal,
             color = if (assigned) Mark7Palette.Ink else Mark7Palette.InkMuted,
             textAlign = TextAlign.Center,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            softWrap = true,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -716,31 +727,37 @@ private fun NodeColumn(
 private fun NodeBubble(
     state: ModeState,
     gesture: Gesture?,
+    catalog: GestureCatalog,
+    disabled: Boolean,
     onClick: (() -> Unit)?,
     size: Dp = NODE_SIZE,
 ) {
     val context = LocalContext.current
     val shape = CircleShape
-    val photo = gesture
-        ?.takeUnless { state.fixed }
-        ?.let { GestureAssets.representativeForDir(context, it.assetDir) }
+    val photo = gesture?.let { GestureAssets.imageFor(context, catalog, it) }
 
     val clickMod = if (onClick == null) Modifier else Modifier.clickable(onClick = onClick)
-    val ring = if (state.fixed || photo != null) Mark7Palette.Accent else Mark7Palette.Line
+    val ring = if (!disabled && (state.fixed || photo != null)) Mark7Palette.Accent else Mark7Palette.Line
 
     Box(
         Modifier.size(size).clip(shape)
-            .background(if (state.fixed) Mark7Palette.AccentSoft else Mark7Palette.SurfaceAlt)
+            .background(
+                when {
+                    state.fixed -> Mark7Palette.AccentSoft
+                    photo != null -> Color.White
+                    else -> Mark7Palette.SurfaceAlt
+                }
+            )
             .border(2.dp, ring, shape)
             .then(clickMod),
         contentAlignment = Alignment.Center,
     ) {
         when {
-            state.fixed -> Text(
-                "IDLE",
-                fontSize = (size.value * 0.21f).sp,
+            disabled -> Text(
+                text = "—",
+                fontSize = (size.value * 0.28f).sp,
                 fontWeight = FontWeight.Bold,
-                color = Mark7Palette.AccentDim,
+                color = Mark7Palette.InkMuted,
             )
 
             photo != null -> AsyncImage(
@@ -748,6 +765,13 @@ private fun NodeBubble(
                 contentDescription = gestureLabel(gesture),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().clip(shape),
+            )
+
+            state.fixed -> Text(
+                "IDLE",
+                fontSize = (size.value * 0.21f).sp,
+                fontWeight = FontWeight.Bold,
+                color = Mark7Palette.AccentDim,
             )
 
             else -> Icon(
@@ -765,7 +789,9 @@ private fun NodeBubble(
 private fun ModeFlowPreview() {
     Mark7Theme {
         ModeFlowContent(
-            mapping = ActionMapping(gestureIdByState = mapOf(2 to "flexion", 4 to "close", 6 to "flexion", 8 to "close")),
+            mapping = ActionMapping()
+                .assignGesture(primaryStateId = 1, gestureId = "cylinder_grip_closed")
+                .assignGesture(primaryStateId = 5, gestureId = "pointing"),
             pushing = false,
             onPickGesture = {},
             onClearAll = {},

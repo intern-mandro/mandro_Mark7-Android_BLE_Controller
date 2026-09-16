@@ -2,9 +2,10 @@ package com.mandro.mark7.presentation.ui.manual
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mandro.mark7.domain.model.CmdDir
-import com.mandro.mark7.domain.model.ManualPreset
-import com.mandro.mark7.domain.model.MotorCommand
+import com.mandro.mark7.domain.model.hand.ManualPreset
+import com.mandro.mark7.domain.model.hand.CmdPresetCatalogs
+import com.mandro.mark7.domain.model.hand.CmdDir
+import com.mandro.mark7.domain.model.hand.MotorCommand
 import com.mandro.mark7.domain.repository.HandRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -16,7 +17,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-import com.mandro.mark7.domain.model.HandDof
+import com.mandro.mark7.domain.model.hand.HandDof
 
 data class ManualUiState(
     val dof: HandDof = HandDof.DEFAULT,
@@ -118,10 +119,6 @@ class ManualViewModel @Inject constructor(
         )
     }
 
-    fun setUseCustomPower(enabled: Boolean) = _uiState.update {
-        it.copy(useCustomPower = enabled)
-    }
-
     fun resetPowerSettings() = _uiState.update {
         it.copy(useCustomPower = false, speedRaw = DEFAULT_SPEED_RAW, currentMa = DEFAULT_CURRENT_MA)
     }
@@ -132,10 +129,6 @@ class ManualViewModel @Inject constructor(
 
     fun setCurrent(value: Int) = _uiState.update {
         it.copy(currentMa = value, useCustomPower = true)
-    }
-
-    fun setPos(index: Int, value: Int) = _uiState.update {
-        it.copy(posDeg = it.posDeg.toMutableList().apply { this[index] = value })
     }
 
     /**
@@ -189,7 +182,7 @@ class ManualViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     lastExecutedPresetId = null,
-                    select = List(6) { false },
+                    select = List(it.dof.dof) { false },
                     armedDir = null,
                     lastCommandedDir = null,
                 )
@@ -200,7 +193,8 @@ class ManualViewModel @Inject constructor(
         // 준비만: 손가락 선택 채우고 방향 버튼 활성화. 전송 안 함.
         _uiState.update {
             it.copy(
-                select = preset.fingers,
+                select = preset.fingers.take(it.dof.dof) +
+                    List((it.dof.dof - preset.fingers.size).coerceAtLeast(0)) { false },
                 armedDir = preset.direction,
                 lastExecutedPresetId = preset.id,
                 lastCommandedDir = null,
@@ -254,54 +248,12 @@ class ManualViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     lastExecutedPresetId = null,
-                    select = List(6) { false },
+                    select = List(it.dof.dof) { false },
                     armedDir = null,
                 )
             }
         }
         val list = presets.value.filterNot { it.id == id }
-        repo.saveManualPresets(list)
-    }
-
-    /** 프리셋 순서 앞으로(왼쪽) 이동 */
-    fun movePresetEarlier(id: String) = viewModelScope.launch {
-        val list = presets.value.toMutableList()
-        val idx = list.indexOfFirst { it.id == id }
-        if (idx > 0) {
-            val item = list.removeAt(idx)
-            list.add(idx - 1, item)
-            repo.saveManualPresets(list)
-        }
-    }
-
-    /** 프리셋 순서 뒤로(오른쪽) 이동 */
-    fun movePresetLater(id: String) = viewModelScope.launch {
-        val list = presets.value.toMutableList()
-        val idx = list.indexOfFirst { it.id == id }
-        if (idx in 0 until list.size - 1) {
-            val item = list.removeAt(idx)
-            list.add(idx + 1, item)
-            repo.saveManualPresets(list)
-        }
-    }
-
-    /** 프리셋 두 항목 순서 맞교환 */
-    fun swapPresets(fromIndex: Int, toIndex: Int) = viewModelScope.launch {
-        val list = presets.value.toMutableList()
-        if (fromIndex in list.indices && toIndex in list.indices && fromIndex != toIndex) {
-            val item = list.removeAt(fromIndex)
-            list.add(toIndex, item)
-            repo.saveManualPresets(list)
-        }
-    }
-
-    /** 갭(gap) 모델 기반 프리셋 이동 */
-    fun movePreset(fromIndex: Int, toGap: Int) = viewModelScope.launch {
-        val list = presets.value.toMutableList()
-        if (fromIndex !in list.indices) return@launch
-        val item = list.removeAt(fromIndex)
-        val insertAt = (if (toGap > fromIndex) toGap - 1 else toGap).coerceIn(0, list.size)
-        list.add(insertAt, item)
         repo.saveManualPresets(list)
     }
 
@@ -316,12 +268,12 @@ class ManualViewModel @Inject constructor(
 
     /**
      * 삭제된 기본 프리셋만 다시 채운다. 현재 프리셋(커스텀·편집·순서)은 그대로 두고,
-     * id 기준으로 빠져 있는 [ManualPreset.DEFAULT_PRESETS] 항목만 뒤에 덧붙인다.
+     * id 기준으로 빠져 있는 현재 자유도의 기본 항목만 뒤에 덧붙인다.
      */
     fun resetPresetsToDefault() = viewModelScope.launch {
         val current = presets.value
         val existingIds = current.mapTo(mutableSetOf()) { it.id }
-        val missing = ManualPreset.DEFAULT_PRESETS.filter { it.id !in existingIds }
+        val missing = CmdPresetCatalogs.forDof(repo.activeDof.value).filter { it.id !in existingIds }
         if (missing.isEmpty()) return@launch
         repo.saveManualPresets(current + missing)
     }
