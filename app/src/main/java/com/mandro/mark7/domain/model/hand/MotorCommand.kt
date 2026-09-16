@@ -1,4 +1,4 @@
-package com.mandro.mark7.domain.model
+package com.mandro.mark7.domain.model.hand
 
 import kotlinx.serialization.Serializable
 
@@ -40,13 +40,5 @@ data class MotorCommand(
         result = 31 * result + posDeg.contentHashCode()
         result = 31 * result + dir.hashCode()
         return result
-    }
-
-    companion object {
-        fun allFingers(dir: CmdDir) = MotorCommand(
-            select = BooleanArray(6) { true },
-            posDeg = IntArray(6),
-            dir = dir,
-        )
     }
 }

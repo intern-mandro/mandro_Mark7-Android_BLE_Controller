@@ -1,4 +1,4 @@
-package com.mandro.mark7.domain.model
+package com.mandro.mark7.domain.model.hand
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull

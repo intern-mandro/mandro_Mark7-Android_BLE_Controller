@@ -1,20 +1,13 @@
-package com.mandro.mark7.domain.model
+package com.mandro.mark7.domain.model.hand
 
 import androidx.annotation.StringRes
 import com.mandro.mark7.R
 
-/**
- * 로봇 의수 자유도(DOF) 버전.
- *
- * - [DOF_5]: 5자유도 (F1 엄지 ~ F5 소지, 5개 모터)
- * - [DOF_6]: 6자유도 (F1 엄지 ~ F5 소지 + F6 엄지외전, 6개 모터 — Mark7 표준)
- * - [DOF_7]: 7자유도 (F1 엄지 ~ F6 엄지외전 + F7 손목회전, 7개 모터 — 확장 모델)
- */
 enum class HandDof(
-    val dof: Int,
-    val id: String,
-    @StringRes val titleRes: Int,
-    @StringRes val descRes: Int,
+    val dof: Int,                              // 실제 모터(자유도) 개수
+    val id: String,                            // 식별용 문자열 키
+    @StringRes val titleRes: Int,              // 제목
+    @StringRes val descRes: Int,               // 설명
     @StringRes val badgeRes: Int? = null,
 ) {
     DOF_7(

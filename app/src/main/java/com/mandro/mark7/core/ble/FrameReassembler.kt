@@ -3,15 +3,16 @@ package com.mandro.mark7.core.ble
 /**
  * BLE notify 는 바이트 스트림을 임의 크기로 쪼개 던진다. Mark7 수신 프레임은
  *  - ACK    : "SETok" (5 byte, 고정 리터럴)
- *  - STATUS : 36 byte, 헤더 없음 — 끝바이트가 XOR 체크섬 (`buf[0..34]` XOR == `buf[35]`)
+ *  - STATUS : 20 byte 고정 — `[0]` 헤더([MarkSevenProtocol.HDR_STATUS]) + `[1]` dof … `[18]` voltage,
+ *             끝바이트가 XOR 체크섬 (`XOR(buf[1 .. STATUS_SIZE-2]) == buf[STATUS_SIZE-1]`)
  *
- * ACK 와 STATUS 가 같은 notify(FFF1) 로 섞여 오므로 버퍼 앞에서 판별한다:
+ * ACK 와 STATUS 가 같은 notify(fff1) 로 섞여 오므로 버퍼 앞에서 판별한다:
  *  1. "SETok" 로 시작하면 ACK (5 byte 소비)
- *  2. 아니면 앞 36 byte 의 XOR 체크섬이 맞을 때만 STATUS (36 byte 소비)
+ *  2. 헤더 바이트가 맞고 앞 STATUS_SIZE byte 의 XOR 체크섬이 맞으면 STATUS 소비
  *  3. 둘 다 아니면 1 byte 버리고 재시도 → 스트림이 어긋나도 다음 유효 프레임에서 재정렬
  *
- * (2) 의 체크섬 검증이 없으면 notify 한 개만 유실돼도 36 byte 경계가 영구히 밀린다
- * (STATUS 에 헤더가 없어 재동기 기준점이 이 체크섬뿐).
+ * 헤더 바이트가 재동기 기준점이라 (2) 는 헤더 스캔 + 체크섬 확인 한 번으로 끝난다.
+ * 프레임이 7DOF 크기로 고정이므로 reassembler 는 DOF 를 알 필요가 없다.
  *
  * 스레드 안전하지 않다 — BleManager 의 gatt 콜백(단일 바인더 스레드)에서만 쓴다.
  */
@@ -64,8 +65,8 @@ class FrameReassembler(
             // 아직 STATUS 한 개도 검증 못 함 → 더 받아야 함
             if (buffer.size < statusSize) return null
 
-            // 2) STATUS — 앞 36 byte XOR 체크섬 검증 (+ 재정렬 중이면 뒤 프레임까지 확인)
-            if (statusChecksumOkAt(0) && confirmedAt(0)) {
+            // 2) STATUS — 헤더 바이트 + 앞 STATUS_SIZE byte XOR 체크섬 검증 (+ 재정렬 중이면 뒤 프레임까지 확인)
+            if (statusOkAt(0) && confirmedAt(0)) {
                 val bytes = ByteArray(statusSize) { buffer.removeFirst() }
                 return finish(Frame.Status(bytes))
             }
@@ -92,24 +93,26 @@ class FrameReassembler(
         return true
     }
 
-    private fun statusChecksumOkAt(offset: Int): Boolean {
+    /** offset 위치가 헤더 바이트로 시작하고 XOR(buf[1 .. statusSize-2]) == buf[statusSize-1] 인가. */
+    private fun statusOkAt(offset: Int): Boolean {
         if (buffer.size < offset + statusSize) return false
+        if ((buffer.elementAt(offset).toInt() and 0xFF) != MarkSevenProtocol.HDR_STATUS) return false
         var acc = 0
-        for (i in 0 until statusSize - 1) acc = acc xor (buffer.elementAt(offset + i).toInt() and 0xFF)
+        for (i in 1 until statusSize - 1) acc = acc xor (buffer.elementAt(offset + i).toInt() and 0xFF)
         return acc.toByte() == buffer.elementAt(offset + statusSize - 1)
     }
 
     /**
-     * 재정렬 중(직전에 바이트를 버린 상태)에는 1/256 확률의 우연한 체크섬 일치로 잘못
-     * lock 되는 걸 막기 위해, 바로 뒤가 또 다른 유효 프레임 시작인지 한 번 더 본다.
-     * 정상 흐름(`droppedSinceGood == 0`)에서는 지연 없이 체크섬만으로 통과.
+     * 재정렬 중(직전에 바이트를 버린 상태)에는 우연한 헤더+체크섬 일치로 잘못 lock 되는 걸
+     * 막기 위해, 바로 뒤가 또 다른 유효 프레임 시작인지 한 번 더 본다.
+     * 정상 흐름(`droppedSinceGood == 0`)에서는 지연 없이 통과.
      */
     private fun confirmedAt(offset: Int): Boolean {
         if (droppedSinceGood == 0) return true
         val next = offset + statusSize
         return when {
             matchesAt(ack, next) -> true
-            statusChecksumOkAt(next) -> true
+            statusOkAt(next) -> true
             buffer.size < next + statusSize -> true // 뒤를 아직 확인 불가 — 통과 (제한된 위험)
             else -> false
         }

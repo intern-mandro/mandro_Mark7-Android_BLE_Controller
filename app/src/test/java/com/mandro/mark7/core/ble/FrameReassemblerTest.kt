@@ -5,18 +5,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * FrameReassembler 는 같은 notify 채널로 섞여 오는 ACK("SETok") 와 STATUS(36B) 를
- * 버퍼 앞에서 판별하고, STATUS 는 XOR 체크섬으로 검증한다. 스트림이 어긋나면
- * 1 byte 씩 버리며 다음 유효 프레임에 재정렬한다.
+ * FrameReassembler 는 같은 notify 채널로 섞여 오는 ACK("SETok") 와 STATUS(20B, 헤더 있음) 를
+ * 버퍼 앞에서 판별하고, STATUS 는 헤더 바이트 + XOR 체크섬으로 검증한다. 스트림이 어긋나면
+ * 1 byte 씩 버리며 다음 유효 프레임(= 다음 헤더 바이트)에 재정렬한다.
  */
 class FrameReassemblerTest {
 
-    private val statusSize = MarkSevenProtocol.STATUS_SIZE
+    private val statusSize = MarkSevenProtocol.STATUS_SIZE // 20
 
-    /** 체크섬이 올바른 STATUS 36바이트 프레임. seed 로 내용만 바꾼다. */
+    /** 헤더 + dof + 올바른 체크섬을 갖춘 STATUS 프레임. seed 로 페이로드만 바꾼다. */
     private fun status(seed: Int = 0): ByteArray {
-        val b = ByteArray(statusSize) { ((it * 7 + seed * 31 + 1) and 0xFF).toByte() }
-        b[statusSize - 1] = MarkSevenProtocol.xor(b, 0, statusSize - 1)
+        val b = ByteArray(statusSize) { ((it * 7 + seed * 31 + 3) and 0xFF).toByte() }
+        b[0] = MarkSevenProtocol.HDR_STATUS.toByte()
+        b[1] = 6 // dof
+        b[statusSize - 1] = MarkSevenProtocol.xor(b, 1, statusSize - 1)
         return b
     }
 
@@ -46,8 +48,8 @@ class FrameReassemblerTest {
         val r = FrameReassembler()
         val s = status(4)
 
-        assertTrue(r.offer(s.copyOfRange(0, 20)).isEmpty())
-        val frames = r.offer(s.copyOfRange(20, statusSize))
+        assertTrue(r.offer(s.copyOfRange(0, 10)).isEmpty())
+        val frames = r.offer(s.copyOfRange(10, statusSize))
 
         assertEquals(1, frames.size)
         assertTrue(frames[0] is FrameReassembler.Frame.Status)
@@ -57,11 +59,10 @@ class FrameReassemblerTest {
     @Test
     fun `bad checksum frame does not desync following frames`() {
         val r = FrameReassembler()
-        val corrupt = status(5).also { it[10] = (it[10] + 1).toByte() } // 체크섬 깨짐
+        val corrupt = status(5).also { it[8] = (it[8] + 1).toByte() } // 체크섬 깨짐
 
         val frames = r.offer(corrupt + status(6) + status(7))
 
-        // 깨진 프레임은 버려지고 뒤 두 개는 정상 수신
         assertEquals(2, frames.count { it is FrameReassembler.Frame.Status })
         assertTrue(r.resyncCount >= 1)
     }
@@ -82,7 +83,6 @@ class FrameReassemblerTest {
         val r = FrameReassembler()
         val s1 = status(1)
         val s2 = status(2)
-        // s2 의 첫 바이트가 유실된 스트림 + 뒤에 정상 프레임들
         val stream = s1 + s2.copyOfRange(1, statusSize) + status(3) + status(4) + status(5)
 
         val frames = r.offer(stream)
@@ -95,7 +95,7 @@ class FrameReassemblerTest {
     @Test
     fun `reset clears buffered partial frame`() {
         val r = FrameReassembler()
-        r.offer(status(1).copyOfRange(0, 20))
+        r.offer(status(1).copyOfRange(0, 10))
         r.reset()
 
         val frames = r.offer(status(2))
