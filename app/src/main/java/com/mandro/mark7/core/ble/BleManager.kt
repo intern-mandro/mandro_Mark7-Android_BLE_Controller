@@ -29,6 +29,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -199,8 +201,13 @@ class BleManager @Inject constructor(
     }
 
     // ── 송신 (MTU 안전 청킹 분할 전송) ─────────────────────────────
+    // CMD(14B)·MSET(27B) 는 모두 여러 청크로 나뉘므로, 동시에 보내면 청크가 섞여 프레임이 깨진다 → 한 프레임씩 보냄
+    private val writeMutex = Mutex()
+
+    suspend fun writeFrame(bytes: ByteArray): Boolean = writeMutex.withLock { writeFrameLocked(bytes) }
+
     @SuppressLint("MissingPermission")
-    suspend fun writeFrame(bytes: ByteArray): Boolean {
+    private suspend fun writeFrameLocked(bytes: ByteArray): Boolean {
         val g = gatt ?: run { Log.w(TAG, "writeFrame: no gatt"); return false }
         val ch = writeChar ?: run { Log.w(TAG, "writeFrame: no writeChar"); return false }
         val type = if (ch.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0)
