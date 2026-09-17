@@ -7,6 +7,8 @@ import kotlinx.serialization.Serializable
 data class HandConfig(
     val settings: GlobalSettings = GlobalSettings.DEFAULT,
 ) {
+    fun forDof(dof: HandDof): HandConfig = copy(settings = settings.forDof(dof.dof))
+
     companion object {
         val DEFAULT = HandConfig()
     }
@@ -26,7 +28,19 @@ data class GlobalSettings(
     val emgAmp: List<Int>,          // EMG 채널 증폭 게인 (값 두개)
     val emgFilter: Int,             // EMG 신호 필터 강도
 ) {
+    // MSET 이 모터 수만큼 max_current·motor_speed 를 싣도록, 모자란 모터 칸을 기본값으로 채움 (이미 있는 값은 유지)
+    fun forDof(dof: Int): GlobalSettings = copy(
+        maxCurrent = maxCurrent.padTo(dof, DEFAULT_MAX_CURRENT_MA),
+        motorSpeed = motorSpeed.padTo(dof, DEFAULT_MOTOR_SPEED),
+    )
+
     companion object {
+        private const val DEFAULT_MAX_CURRENT_MA = 1200
+        private const val DEFAULT_MOTOR_SPEED = 255
+
+        private fun List<Int>.padTo(size: Int, fill: Int): List<Int> =
+            if (this.size >= size) this else this + List(size - this.size) { fill }
+
         val DEFAULT = GlobalSettings(
             graspCurrent = listOf(1050, 1050, 1050, 1050, 950, 950),
             releaseCurrent = listOf(900, 900, 900, 900, 900, 800),

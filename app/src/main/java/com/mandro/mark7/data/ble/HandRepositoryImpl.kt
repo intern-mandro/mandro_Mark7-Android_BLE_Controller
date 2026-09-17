@@ -94,10 +94,12 @@ class HandRepositoryImpl @Inject constructor(
     override suspend fun updateConfig(config: HandConfig) = configStore.saveConfig(config)
 
     override suspend fun pushConfig(config: HandConfig?): Result<Unit> = withContext(Dispatchers.IO) {
-        val g = (config ?: this@HandRepositoryImpl.config.value).settings
+        val dof = activeDof.value.dof
+        // 연결된 의수 자유도가 선택값과 달라도 모터 수만큼 값이 실리도록 채움
+        val g = (config ?: this@HandRepositoryImpl.config.value).settings.forDof(dof)
         _configPushState.value = ConfigPushState.Sending
         val frame = MarkSevenProtocol.buildMset(
-            dof = activeDof.value.dof,
+            dof = dof,
             actionIds = actionMapping.value.toActionIds(),
             maxCurrentMa = g.maxCurrent.toIntArray(),
             motorSpeed = g.motorSpeed.toIntArray(),

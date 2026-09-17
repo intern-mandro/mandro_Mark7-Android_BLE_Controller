@@ -20,6 +20,32 @@ class HandConfigTest {
     }
 
     @Test
+    fun `7dof settings fill the seventh motor current and speed with defaults`() {
+        val settings = GlobalSettings.DEFAULT.forDof(7)
+
+        assertEquals(listOf(1200, 1200, 1200, 1200, 1200, 1100, 1200), settings.maxCurrent)
+        assertEquals(List(7) { 255 }, settings.motorSpeed)
+    }
+
+    @Test
+    fun `forDof keeps values the user already set`() {
+        val saved = GlobalSettings.DEFAULT.copy(
+            maxCurrent = listOf(800, 800, 800, 800, 800, 800, 900),
+            motorSpeed = listOf(10, 20, 30, 40, 50, 60),
+        )
+
+        val settings = saved.forDof(7)
+
+        assertEquals(saved.maxCurrent, settings.maxCurrent)
+        assertEquals(listOf(10, 20, 30, 40, 50, 60, 255), settings.motorSpeed)
+    }
+
+    @Test
+    fun `forDof does not shrink lists for fewer motors`() {
+        assertEquals(GlobalSettings.DEFAULT, GlobalSettings.DEFAULT.forDof(5))
+    }
+
+    @Test
     fun `serialized hand config contains only active settings`() {
         val encoded = storeJson.encodeToString(HandConfig.DEFAULT)
 

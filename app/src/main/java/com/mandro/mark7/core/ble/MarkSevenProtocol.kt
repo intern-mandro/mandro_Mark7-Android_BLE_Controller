@@ -38,6 +38,11 @@ object MarkSevenProtocol {
     private const val CUR_BASE = 600          // cur  = byte * 3 + 600
     private const val CUR_STEP = 3
 
+    // EMG 민감도: 5·6·7DOF 공통 0 ~ 20, 기본 10
+    const val EMG_AMP_MIN = 0
+    const val EMG_AMP_MAX = 20
+    const val EMG_AMP_DEFAULT = 10
+
     // 임시값
     const val GRASP_POS_PRESET = 0xC0
     const val RELEASE_POS_PRESET = 0x50
@@ -106,7 +111,7 @@ object MarkSevenProtocol {
      * @param actionIds    길이 8. S1~S8 상태 → ACTION_ID[0..7]. 부족하면 0 패딩.
      * @param maxCurrentMa 길이 dof. byte = (mA - 600) / 3.
      * @param motorSpeed   길이 dof. 원값 0..255.
-     * @param emgAmp       길이 2. 0..20 (게인).
+     * @param emgAmp       길이 2. [EMG_AMP_MIN]..[EMG_AMP_MAX], 값이 없으면 [EMG_AMP_DEFAULT].
      */
     fun buildMset(
         dof: Int,
@@ -131,8 +136,8 @@ object MarkSevenProtocol {
                 if (i >= n) 0
                 else motorSpeed.getOrElse(i) { 0 }.coerceIn(0, 255).toByte()
         }
-        buf[MSET_EMG_OFF] = emgAmp.getOrElse(0) { 0 }.coerceIn(0, 20).toByte()
-        buf[MSET_EMG_OFF + 1] = emgAmp.getOrElse(1) { 0 }.coerceIn(0, 20).toByte()
+        buf[MSET_EMG_OFF] = emgAmp.getOrElse(0) { EMG_AMP_DEFAULT }.coerceIn(EMG_AMP_MIN, EMG_AMP_MAX).toByte()
+        buf[MSET_EMG_OFF + 1] = emgAmp.getOrElse(1) { EMG_AMP_DEFAULT }.coerceIn(EMG_AMP_MIN, EMG_AMP_MAX).toByte()
         buf[MSET_SIZE - 1] = xor(buf, 1, MSET_SIZE - 1)
         return buf
     }

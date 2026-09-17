@@ -1,6 +1,8 @@
 package com.mandro.mark7.core.ble
 
 import com.mandro.mark7.domain.model.hand.CmdDir
+import com.mandro.mark7.domain.model.hand.GlobalSettings
+import com.mandro.mark7.domain.model.hand.HandDof
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -146,6 +148,41 @@ class MarkSevenProtocolTest {
         assertEquals(7.toByte(), frame[1])
         assertEquals(((900 - 600) / 3).toByte(), frame[16]) // max_current[6] 채워짐
         assertEquals(128.toByte(), frame[23])               // motor_speed[6] 채워짐
+    }
+
+    @Test
+    fun `mset 7dof with default settings sends seventh motor current and speed`() {
+        val settings = GlobalSettings.DEFAULT.forDof(7)
+        val frame = MarkSevenProtocol.buildMset(
+            dof = 7,
+            actionIds = IntArray(8),
+            maxCurrentMa = settings.maxCurrent.toIntArray(),
+            motorSpeed = settings.motorSpeed.toIntArray(),
+            emgAmp = settings.emgAmp.toIntArray(),
+        )
+        assertEquals(((1200 - 600) / 3).toByte(), frame[16]) // max_current[6]
+        assertEquals(255.toByte(), frame[23])                // motor_speed[6]
+    }
+
+    @Test
+    fun `mset emg amp uses the same 0 to 20 range for every dof`() {
+        for (dof in 5..7) {
+            fun emg(vararg amp: Int) = MarkSevenProtocol.buildMset(
+                dof = dof, actionIds = IntArray(8), maxCurrentMa = IntArray(dof) { 1200 },
+                motorSpeed = IntArray(dof) { 255 }, emgAmp = amp,
+            ).copyOfRange(24, 26).toList()
+
+            assertEquals(listOf<Byte>(20, 0), emg(20, 0))
+            assertEquals(listOf<Byte>(20, 0), emg(99, -1))  // 범위 밖은 0 · 20 으로
+            assertEquals(listOf<Byte>(10, 10), emg())       // 값이 없으면 기본 10
+        }
+    }
+
+    @Test
+    fun `default emg sensitivity is 10 for every dof`() {
+        for (dof in HandDof.entries) {
+            assertEquals(listOf(10, 10), GlobalSettings.DEFAULT.forDof(dof.dof).emgAmp)
+        }
     }
 
     // ── STATUS (20B) ─────────────────────────────────────────────

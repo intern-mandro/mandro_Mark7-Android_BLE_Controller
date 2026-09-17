@@ -44,9 +44,11 @@ class HandConfigStore @Inject constructor(
 
     val config: Flow<HandConfig> =
         combine(handVersionStore.activeDof, dataStore.data) { dof, prefs ->
-            prefs[configKey(dof.id)]
+            val config = prefs[configKey(dof.id)]
                 ?.let { runCatching { json.decodeFromString<HandConfig>(it) }.getOrNull() }
                 ?: HandConfig.DEFAULT
+            // 예전에 6칸으로 저장된 7DOF 설정도 7번째 모터 값을 갖도록 채움
+            config.forDof(dof)
         }.distinctUntilChanged()
 
     /**

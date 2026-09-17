@@ -114,7 +114,8 @@ fun SettingsScreenContent(
     val scrollState = rememberScrollState()
 
     // 슬라이더 편집은 이 draft 에만 반영된다. '전송' 이 성공해야 config(= 의수에 마지막으로 보낸 값)에 저장된다.
-    var draft by remember(ui.config.settings) { mutableStateOf(ui.config.settings) }
+    // 모터 칸을 화면 자유도만큼 채워 두어야 7번째 슬라이더 값도 draft 에 반영된다.
+    var draft by remember(ui.config.settings, ui.dof) { mutableStateOf(ui.config.settings.forDof(ui.dof.dof)) }
 
     Column(
         modifier = Modifier
@@ -143,7 +144,7 @@ fun SettingsScreenContent(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            val defaults = GlobalSettings.DEFAULT
+            val defaults = GlobalSettings.DEFAULT.forDof(ui.dof.dof)
 
             // ── 근전도(EMG) 센서 증폭 게인 (CH1·CH2) ──
             SettingSectionCard(
