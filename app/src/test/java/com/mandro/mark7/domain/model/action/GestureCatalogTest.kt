@@ -164,7 +164,7 @@ class GestureCatalogTest {
         assertEquals((1..14).toList(), pairs.flatMap { listOfNotNull(it.lead, it.companion) }
             .map { catalog.actionIdFor(it.id) })
         assertEquals((15..24).toList(), singles.map { catalog.actionIdFor(it.lead.id) })
-        assertEquals("mset_hand_shape/7dof/24_victory.jpg", catalog.imageAssetPath(singles.last().lead))
+        assertEquals("mset_hand_shape/7dof/24_victory.png", catalog.imageAssetPath(singles.last().lead))
         assertEquals(listOf(99, 99), listOf(6, 8).map {
             ActionMapping(dof = HandDof.DOF_7).toActionIds()[it - 1]
         })

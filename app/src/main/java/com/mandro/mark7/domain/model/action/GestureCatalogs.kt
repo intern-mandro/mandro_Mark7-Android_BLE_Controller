@@ -56,8 +56,7 @@ object GestureCatalogs {
 
     val DOF_7 = GestureCatalog(
         assetFolder = "mset_hand_shape/7dof",
-        imageExtension = "jpg",
-        imageExtensionOverrides = MIDDLE_FINGER_IMAGE_EXTENSION,
+        imageExtension = "png",
         groups = with(Gestures) {
             listOf(
                 pair(CYLINDER_GRIP_OPEN, CYLINDER_GRIP_CLOSED),   // 1, 2
