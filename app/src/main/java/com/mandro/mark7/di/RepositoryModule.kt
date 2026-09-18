@@ -1,6 +1,5 @@
 package com.mandro.mark7.di
 
-import com.mandro.mark7.BuildConfig
 import com.mandro.mark7.data.ble.FakeHandRepository
 import com.mandro.mark7.data.ble.HandRepositoryImpl
 import com.mandro.mark7.data.ble.SwitchableHandRepository
@@ -18,9 +17,10 @@ import javax.inject.Singleton
 object RepositoryModule {
 
     /**
-     * BLE ↔ mock 을 실행 중에 바꾸는 단일 인스턴스. 시작값은 `BuildConfig.USE_MOCK_BLE`
-     * (build.gradle 빌드 타입별 true/false), 이후엔 [MockModeController.setMockMode] 로 바꾼다.
-     * 실제 구현은 [Provider] 라 실제 모드가 처음 필요할 때에야 생성된다 → mock 동안 BLE 는 손대지 않는다.
+     * BLE ↔ mock 을 실행 중에 바꾸는 단일 인스턴스. 앱은 항상 사용자 모드(실제 BLE)로 시작하고,
+     * 개발자 모드는 [MockModeController.setMockMode] 로 그 실행(프로세스) 동안만 켤 수 있다 —
+     * 앱을 재시작하거나 업데이트하면 다시 사용자 모드로 돌아온다.
+     * 실제 구현은 [Provider] 라 처음 필요할 때에야 생성된다.
      */
     @Provides
     @Singleton
@@ -30,7 +30,7 @@ object RepositoryModule {
     ): SwitchableHandRepository = SwitchableHandRepository(
         mock = mock,
         realFactory = real::get,
-        initialMockMode = BuildConfig.USE_MOCK_BLE,
+        initialMockMode = false,
     )
 
     @Provides

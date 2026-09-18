@@ -35,6 +35,9 @@ import kotlinx.coroutines.sync.withLock
  *   mock 으로 시작해 계속 mock 이면 `BleManager` 는 생성조차 되지 않는다.
  *
  * 설정·매핑·프리셋은 두 구현이 같은 `HandConfigStore` 를 쓰므로, BLE 와 무관한 [mock] 쪽에 고정 위임한다.
+ *
+ * [initialMockMode] 는 영속화하지 않는다 — 앱은 항상 사용자 모드(실제 BLE)로 시작하고,
+ * 개발자 모드는 [setMockMode] 로 그 실행(프로세스) 동안만 유지된다.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SwitchableHandRepository(
