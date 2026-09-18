@@ -192,7 +192,6 @@
     <string name="settings_reset_cancel">취소</string>
     <string name="settings_send_set">Send</string>
     <string name="settings_speed">모터 속도</string>
-    <string name="settings_title">설정</string>
     <string name="tab_manual">Control</string>
     <string name="tab_mode">Mode</string>
     <string name="tab_monitor">Monitor</string>
