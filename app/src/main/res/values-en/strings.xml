@@ -193,7 +193,7 @@
     <string name="settings_send_set">Send</string>
     <string name="settings_speed">Motor speed</string>
     <string name="settings_title">Settings</string>
-    <string name="tab_manual">Manual</string>
+    <string name="tab_manual">Control</string>
     <string name="tab_mode">Mode</string>
     <string name="tab_monitor">Monitor</string>
     <string name="tab_settings">Settings</string>
