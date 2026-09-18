@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -91,16 +90,8 @@ private fun MonitorContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        // 상단 타이틀 영역
-        Text(
-            text = stringResource(R.string.monitor_title),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = Mark7Palette.Ink,
-        )
-
         // 1. 모터 상태 테이블 (온도 및 위치/회전량 수치)
         SectionCard(
             title = "${stringResource(R.string.monitor_card_motor_status)} (${ui.dof.dof} DOF)",
@@ -114,40 +105,37 @@ private fun MonitorContent(
         }
 
         // 2. EMG 센서 실시간 파형 모니터 (C:\Intern\mandro-final_Armband_Android\mandro-dynamic-gesture WaveformScreen 참고)
-        SectionCard(
-            title = stringResource(R.string.monitor_card_emg),
+        // Motor Status 와 달리 흰 카드(SectionCard)로 감싸지 않고 바로 배치한다.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF0F1420)) // MandroPalette.DarkBg
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF0F1420)) // MandroPalette.DarkBg
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                // CH 1 (빨간색 - MandroPalette.WaveCH0: #E44444)
-                EmgChannelRow(
-                    channelName = "CH 1",
-                    value = status?.emg?.getOrNull(0),
-                    buffer = status?.let { emgBuffers?.getOrNull(0) },
-                    writePtr = ui.writePtr,
-                    color = Color(0xFFE44444),
-                )
+            // CH 1 (빨간색 - MandroPalette.WaveCH0: #E44444)
+            EmgChannelRow(
+                channelName = "EMG CH1",
+                value = status?.emg?.getOrNull(0),
+                buffer = status?.let { emgBuffers?.getOrNull(0) },
+                writePtr = ui.writePtr,
+                color = Color(0xFFE44444),
+            )
 
-                HorizontalDivider(
-                    color = Color(0xFF1F2636),
-                    thickness = 0.8.dp,
-                )
+            HorizontalDivider(
+                color = Color(0xFF1F2636),
+                thickness = 0.8.dp,
+            )
 
-                // CH 2 (파란색 - MandroPalette.WaveCH5: #446CE4)
-                EmgChannelRow(
-                    channelName = "CH 2",
-                    value = status?.emg?.getOrNull(1),
-                    buffer = status?.let { emgBuffers?.getOrNull(1) },
-                    writePtr = ui.writePtr,
-                    color = Color(0xFF446CE4),
-                )
-            }
+            // CH 2 (파란색 - MandroPalette.WaveCH5: #446CE4)
+            EmgChannelRow(
+                channelName = "EMG CH2",
+                value = status?.emg?.getOrNull(1),
+                buffer = status?.let { emgBuffers?.getOrNull(1) },
+                writePtr = ui.writePtr,
+                color = Color(0xFF446CE4),
+            )
         }
     }
 
@@ -385,12 +373,13 @@ private fun EmgChannelRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // 좌측 채널 라벨 및 현재 계측 수치 (중앙 기준선 및 가로 중앙 정렬)
-        Box(
+        // 좌측 채널 라벨 및 현재 계측 수치 (세로로 쌓아 겹치지 않게 배치, 라벨은 줄바꿈 허용)
+        Column(
             modifier = Modifier
                 .width(48.dp)
                 .fillMaxHeight(),
-            contentAlignment = Alignment.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = channelName,
@@ -401,8 +390,8 @@ private fun EmgChannelRow(
                     letterSpacing = 0.5.sp,
                     textAlign = TextAlign.Center,
                 ),
-                modifier = Modifier.align(Alignment.Center),
             )
+            Spacer(Modifier.height(4.dp))
             Text(
                 text = value?.toString() ?: PLACEHOLDER_DASH,
                 style = TextStyle(
@@ -411,9 +400,6 @@ private fun EmgChannelRow(
                     color = Color(0xFFB0B8C4),
                     textAlign = TextAlign.Center,
                 ),
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .offset(y = 15.dp),
             )
         }
 

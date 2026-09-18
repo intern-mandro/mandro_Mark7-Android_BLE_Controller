@@ -129,14 +129,12 @@
     <string name="mode_send_done">Sent to the hand.</string>
     <string name="mode_send_failed">Send failed.</string>
     <string name="mode_switch_by_close">Close Switch</string>
-    <string name="monitor_card_emg">EMG</string>
     <string name="monitor_card_motor_status">Motor Status</string>
     <string name="monitor_emg_ch0">CH 1</string>
     <string name="monitor_emg_ch1">CH 2</string>
     <string name="monitor_header_motor">Motor</string>
     <string name="monitor_temp_label">Temp</string>
-    <string name="monitor_title">Monitor</string>
-    <string name="monitor_turn_label">Turns</string>
+    <string name="monitor_turn_label">Positions</string>
     <string name="monitor_waiting_status">Waiting for STATUS frames…</string>
     <string name="monitor_waiting_status_desc">Measurements will appear once status packets are received from the hand.</string>
     <string name="motor_f1">F1 Thumb</string>

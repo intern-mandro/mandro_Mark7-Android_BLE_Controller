@@ -84,7 +84,7 @@ fun ResetConfirmDialog(
 /** 화면 섹션을 감싸는 카드. 제목 + 우측 보조 슬롯 + 내용. */
 @Composable
 fun SectionCard(
-    title: String,
+    title: String? = null,
     modifier: Modifier = Modifier,
     trailing: @Composable (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
@@ -96,13 +96,17 @@ fun SectionCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                trailing?.invoke()
+            if (title != null || trailing != null) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (title != null) {
+                        Text(title, style = MaterialTheme.typography.titleMedium)
+                    }
+                    trailing?.invoke()
+                }
             }
             content()
         }

@@ -129,14 +129,12 @@
     <string name="mode_send_done">전송이 완료됐습니다.</string>
     <string name="mode_send_failed">전송에 실패했습니다.</string>
     <string name="mode_switch_by_close">Close 전환</string>
-    <string name="monitor_card_emg">EMG</string>
     <string name="monitor_card_motor_status">모터 상태</string>
     <string name="monitor_emg_ch0">CH 1</string>
     <string name="monitor_emg_ch1">CH 2</string>
     <string name="monitor_header_motor">모터</string>
     <string name="monitor_temp_label">온도</string>
-    <string name="monitor_title">모니터링</string>
-    <string name="monitor_turn_label">회전수</string>
+    <string name="monitor_turn_label">위치</string>
     <string name="monitor_waiting_status">STATUS 프레임 수신 대기 중…</string>
     <string name="monitor_waiting_status_desc">의수로부터 상태 패킷이 도착하면 계측값이 표시됩니다.</string>
     <string name="motor_f1">F1 엄지</string>
