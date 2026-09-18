@@ -116,25 +116,15 @@ fun SettingsScreenContent(
     // 슬라이더 편집은 이 draft 에만 반영된다. '전송' 이 성공해야 config(= 의수에 마지막으로 보낸 값)에 저장된다.
     // 모터 칸을 화면 자유도만큼 채워 두어야 7번째 슬라이더 값도 draft 에 반영된다.
     var draft by remember(ui.config.settings, ui.dof) { mutableStateOf(ui.config.settings.forDof(ui.dof.dof)) }
+    var showResetConfirm by remember { mutableStateOf(false) }
+    val defaults = GlobalSettings.DEFAULT.forDof(ui.dof.dof)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Mark7Palette.Bg),
     ) {
-        // ── 1. 상단 타이틀 ──
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.settings_title),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = Mark7Palette.Ink,
-            )
-        }
+        Spacer(Modifier.height(12.dp))
 
         // ── 2. 스크롤 가능한 본문 영역 ──
         Column(
@@ -144,18 +134,11 @@ fun SettingsScreenContent(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            val defaults = GlobalSettings.DEFAULT.forDof(ui.dof.dof)
-
             // ── 근전도(EMG) 센서 증폭 게인 (CH1·CH2) ──
             SettingSectionCard(
                 title = stringResource(R.string.settings_emg_sens_title),
             ) {
                 EmgBody(g = draft, onChange = { draft = it })
-                SettingActionRow(
-                    pushing = ui.pushing,
-                    onSend = { actions.applyAndPush(draft) },
-                    onDefault = { draft = draft.copy(emgAmp = defaults.emgAmp) },
-                )
             }
 
             // ── 최대 전류량 제한 (자유도별) ──
@@ -175,11 +158,6 @@ fun SettingsScreenContent(
                     maxLabel = "1500 mA",
                     onCommit = { i, v -> draft = draft.copy(maxCurrent = draft.maxCurrent.withAt(i, v)) },
                 )
-                SettingActionRow(
-                    pushing = ui.pushing,
-                    onSend = { actions.applyAndPush(draft) },
-                    onDefault = { draft = draft.copy(maxCurrent = defaults.maxCurrent) },
-                )
             }
 
             // ── 모터 속도 ──
@@ -195,15 +173,24 @@ fun SettingsScreenContent(
                     maxLabel = "255",
                     onCommit = { i, v -> draft = draft.copy(motorSpeed = draft.motorSpeed.withAt(i, v)) },
                 )
-                SettingActionRow(
-                    pushing = ui.pushing,
-                    onSend = { actions.applyAndPush(draft) },
-                    onDefault = { draft = draft.copy(motorSpeed = defaults.motorSpeed) },
-                )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(12.dp))
         }
+
+        // ── 3. 화면 하단 고정 바 — 스크롤해도 항상 보인다 ──
+        SettingsBottomBar(
+            pushing = ui.pushing,
+            onSend = { actions.applyAndPush(draft) },
+            onDefaultClick = { showResetConfirm = true },
+        )
+    }
+
+    if (showResetConfirm) {
+        ResetConfirmDialog(
+            onConfirm = { draft = defaults; showResetConfirm = false },
+            onDismiss = { showResetConfirm = false },
+        )
     }
 }
 
@@ -357,62 +344,56 @@ private fun EmgBody(
 }
 
 /**
- * 각 섹션 카드 본문 맨 아래에 들어가는 [디폴트][SET 전송] 버튼 줄.
- * - 디폴트: 그 섹션의 파라미터를 기본값으로 되돌린다. 누르면 먼저 확인 다이얼로그를 띄운다.
+ * 화면 맨 아래 고정 [디폴트][SET 전송] 버튼 바. 스크롤 영역 밖에 있어 항상 보인다.
+ * - 디폴트: 모든 설정을 기본값으로 되돌린다(확인 다이얼로그는 호출부에서 띄운다).
  * - SET 전송: 전체 설정을 SET 프레임으로 의수에 보낸다(SET 은 통짜라 특징별 분리 전송은 불가).
  *   전송 중엔 버튼 비활성 + 문구 전환, 결과는 화면 상단 배너(Mode 탭과 동일)로 표시된다.
  */
 @Composable
-private fun SettingActionRow(
+private fun SettingsBottomBar(
     pushing: Boolean,
     onSend: () -> Unit,
-    onDefault: () -> Unit,
+    onDefaultClick: () -> Unit,
 ) {
-    var showResetConfirm by remember { mutableStateOf(false) }
-
-    HorizontalDivider(color = Mark7Palette.Line)
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        OutlinedButton(
-            onClick = { showResetConfirm = true },
-            modifier = Modifier.height(30.dp),
-            shape = RoundedCornerShape(6.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.settings_reset),
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Medium,
-            )
-        }
-        Button(
-            onClick = onSend,
-            enabled = !pushing,
-            colors = ButtonDefaults.buttonColors(containerColor = Mark7Palette.Accent),
+    Column(Modifier.fillMaxWidth()) {
+        HorizontalDivider(color = Mark7Palette.Line)
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .height(30.dp),
-            shape = RoundedCornerShape(6.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = stringResource(if (pushing) R.string.common_sending else R.string.settings_send_set),
-                fontSize = 11.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-            )
+            OutlinedButton(
+                onClick = onDefaultClick,
+                modifier = Modifier.height(36.dp),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_reset),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            Button(
+                onClick = onSend,
+                enabled = !pushing,
+                colors = ButtonDefaults.buttonColors(containerColor = Mark7Palette.Accent),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(36.dp),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+            ) {
+                Text(
+                    text = stringResource(if (pushing) R.string.common_sending else R.string.settings_send_set),
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                )
+            }
         }
-    }
-
-    if (showResetConfirm) {
-        ResetConfirmDialog(
-            onConfirm = onDefault,
-            onDismiss = { showResetConfirm = false },
-        )
     }
 }
 
