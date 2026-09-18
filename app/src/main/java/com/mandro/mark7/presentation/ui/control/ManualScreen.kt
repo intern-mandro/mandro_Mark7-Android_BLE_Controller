@@ -292,17 +292,9 @@ private fun ManualContent(
             .fillMaxSize()
             .onGloballyPositioned { scrollContainerCoordinates = it }
             .verticalScroll(scrollState, enabled = !isDragging)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // 상단 타이틀
-        Text(
-            text = stringResource(R.string.manual_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = Mark7Palette.Ink,
-        )
-
         // ─── 1. 손가락 직접 선택 & 쥐기/펴기 통합 카드 ───
         CompactCard(
             title = stringResource(R.string.manual_step1_title),

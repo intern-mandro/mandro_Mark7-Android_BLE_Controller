@@ -76,7 +76,7 @@
     <string name="manual_cancel">Cancel</string>
     <string name="manual_clear">Clear</string>
     <string name="manual_confirm">Execute</string>
-    <string name="manual_current_label">Grip\nStrength</string>
+    <string name="manual_current_label">Current</string>
     <string name="manual_feedback_grasp">✓ Grasp executed (%1$s)</string>
     <string name="manual_feedback_release">✓ Release executed (%1$s)</string>
     <string name="manual_feedback_reset_counter">✓ Turn counter reset executed</string>
@@ -118,7 +118,6 @@
     <string name="manual_speed_slow">Slow</string>
     <string name="manual_step1_title">Select Fingers</string>
     <string name="manual_step3_title">Fine Tuning</string>
-    <string name="manual_title">Manual Control</string>
     <string name="mode_1_title">Mode 1 (Sequential Action)</string>
     <string name="mode_2_title">Mode 2 (Single Action)</string>
     <string name="mode_apply_set">Send</string>

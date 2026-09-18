@@ -76,7 +76,7 @@
     <string name="manual_cancel">취소</string>
     <string name="manual_clear">해제</string>
     <string name="manual_confirm">실행</string>
-    <string name="manual_current_label">쥐는 힘</string>
+    <string name="manual_current_label">전류</string>
     <string name="manual_feedback_grasp">✓ 쥐기 실행 (%1$s)</string>
     <string name="manual_feedback_release">✓ 펴기 실행 (%1$s)</string>
     <string name="manual_feedback_reset_counter">✓ 턴 카운터 리셋 실행</string>
@@ -118,7 +118,6 @@
     <string name="manual_speed_slow">천천히</string>
     <string name="manual_step1_title">손가락 선택</string>
     <string name="manual_step3_title">세부 조절</string>
-    <string name="manual_title">수동 제어</string>
     <string name="mode_1_title">Mode 1 (연속 동작)</string>
     <string name="mode_2_title">Mode 2 (단일 동작)</string>
     <string name="mode_apply_set">Send</string>

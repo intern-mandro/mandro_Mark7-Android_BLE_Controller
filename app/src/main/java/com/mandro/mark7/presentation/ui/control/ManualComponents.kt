@@ -113,7 +113,7 @@ internal fun CompactCard(
         border = BorderStroke(1.dp, Mark7Palette.Line.copy(alpha = 0.7f)),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (title != null || trailing != null) {
@@ -128,7 +128,7 @@ internal fun CompactCard(
                     if (title != null) {
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Mark7Palette.Ink,
                         )
@@ -262,7 +262,9 @@ internal fun FineTuningAccordionCard(
                     ),
                 )
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = Mark7Palette.Line)
+                Spacer(Modifier.height(12.dp))
 
                 // [기본값] [적용] — Settings 탭 하단 바(StickyBottomBar)와 동일 스타일
                 Row(
