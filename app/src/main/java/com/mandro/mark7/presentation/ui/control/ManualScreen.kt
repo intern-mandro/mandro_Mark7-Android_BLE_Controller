@@ -117,7 +117,11 @@ fun ManualScreen(
             onSetAll = viewModel::setAllFingers,
             onSetSpeed = viewModel::setSpeed,
             onSetCurrent = viewModel::setCurrent,
-            onResetPowerSettings = viewModel::resetPowerSettings,
+            onResetPowerSettings = {
+                viewModel.resetPowerSettings()
+                showFastToast(context.getString(R.string.manual_feedback_power_reset))
+            },
+            onApplyPower = { showFastToast(context.getString(R.string.manual_feedback_power_apply)) },
             onSend = { dir ->
                 viewModel.send(dir)
                 val summary = ui.select.mapIndexedNotNull { i, on -> if (on) "F${i + 1}" else null }.joinToString(" ")
@@ -206,6 +210,7 @@ private fun ManualContent(
     onSetSpeed: (Int) -> Unit,
     onSetCurrent: (Int) -> Unit,
     onResetPowerSettings: () -> Unit,
+    onApplyPower: () -> Unit,
     onSend: (CmdDir) -> Unit,
     onExecutePreset: (ManualPreset) -> Unit,
     onCreatePreset: (name: String, emoji: String, imageUri: String?, imageBiasX: Float, imageBiasY: Float, fingers: List<Boolean>, dir: CmdDir) -> Unit,
@@ -678,7 +683,7 @@ private fun ManualContent(
             onApply = { currentMa, speedRaw ->
                 onSetCurrent(currentMa)
                 onSetSpeed(speedRaw)
-                fineTuningExpanded = false
+                onApplyPower()
             },
             onResetDefault = onResetPowerSettings,
             defaultCurrent = ManualViewModel.DEFAULT_CURRENT_MA,
@@ -823,6 +828,7 @@ private fun ManualPreview() {
             onSetSpeed = {},
             onSetCurrent = {},
             onResetPowerSettings = {},
+            onApplyPower = {},
             onSend = {},
             onExecutePreset = {},
             onCreatePreset = { _, _, _, _, _, _, _ -> },

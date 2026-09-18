@@ -80,6 +80,8 @@
     <string name="manual_feedback_grasp">✓ 쥐기 실행 (%1$s)</string>
     <string name="manual_feedback_release">✓ 펴기 실행 (%1$s)</string>
     <string name="manual_feedback_reset_counter">✓ 턴 카운터 리셋 실행</string>
+    <string name="manual_feedback_power_apply">✓ 전류·속도 설정 적용됨</string>
+    <string name="manual_feedback_power_reset">✓ 기본값으로 적용됨</string>
     <string name="manual_feedback_reset_power">✓ 전체 모터 전원 리셋 실행</string>
     <string name="manual_grasp_btn">✊ 쥐기</string>
     <string name="manual_grasp_title">쥐기</string>

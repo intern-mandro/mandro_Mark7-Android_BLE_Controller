@@ -80,6 +80,8 @@
     <string name="manual_feedback_grasp">✓ Grasp executed (%1$s)</string>
     <string name="manual_feedback_release">✓ Release executed (%1$s)</string>
     <string name="manual_feedback_reset_counter">✓ Turn counter reset executed</string>
+    <string name="manual_feedback_power_apply">✓ Current/speed settings applied</string>
+    <string name="manual_feedback_power_reset">✓ Reset to default and applied</string>
     <string name="manual_feedback_reset_power">✓ All motor power reset executed</string>
     <string name="manual_grasp_btn">✊ Grasp</string>
     <string name="manual_grasp_title">Grasp</string>
