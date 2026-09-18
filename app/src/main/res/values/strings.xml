@@ -20,7 +20,7 @@
     <string name="dof_5_title">Mark7 (5DOF)</string>
     <string name="dof_6_desc">F1 엄지 · F2 검지 · F3 중지 · F4 약지 · F5 소지 · F6 엄지외전</string>
     <string name="dof_6_title">Mark7 (6DOF)</string>
-    <string name="dof_7_desc">F1 엄지 · F2 검지 · F3 중지 · F4 약지 · F5 소지 · F6 엄지외전 · F7 손목회전</string>
+    <string name="dof_7_desc">F1 엄지 · F2 검지 · F3 중지 · F4 약지 · F5 소지 · F6 엄지외전 · F7 검지외전</string>
     <string name="dof_7_title">Mark7 (7DOF)</string>
     <string name="dof_all_models_label">모든 모델</string>
     <string name="dof_close_btn">close</string>
@@ -144,14 +144,14 @@
     <string name="motor_f4">F4 약지</string>
     <string name="motor_f5">F5 소지</string>
     <string name="motor_f6">F6 엄지외전</string>
-    <string name="motor_f7">F7 손목회전</string>
+    <string name="motor_f7">F7 검지외전</string>
     <string name="motor_short_f1">엄지</string>
     <string name="motor_short_f2">검지</string>
     <string name="motor_short_f3">중지</string>
     <string name="motor_short_f4">약지</string>
     <string name="motor_short_f5">소지</string>
     <string name="motor_short_f6">엄지외전</string>
-    <string name="motor_short_f7">손목회전</string>
+    <string name="motor_short_f7">검지외전</string>
     <string name="perm_ble_desc">의수를 검색하고 제어하려면 근처 기기(블루투스) 권한이 필요합니다.</string>
     <string name="perm_ble_grant">권한 허용하기</string>
     <string name="perm_ble_settings">앱 설정 열기</string>

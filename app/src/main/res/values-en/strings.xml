@@ -20,7 +20,7 @@
     <string name="dof_5_title">Mark7 (5DOF)</string>
     <string name="dof_6_desc">F1 Thumb · F2 Index · F3 Middle · F4 Ring · F5 Little · F6 Thumb Abd.</string>
     <string name="dof_6_title">Mark7 (6DOF)</string>
-    <string name="dof_7_desc">F1 Thumb · F2 Index · F3 Middle · F4 Ring · F5 Little · F6 Thumb Abd. · F7 Wrist</string>
+    <string name="dof_7_desc">F1 Thumb · F2 Index · F3 Middle · F4 Ring · F5 Little · F6 Thumb Abd. · F7 Index Abd.</string>
     <string name="dof_7_title">Mark7 (7DOF)</string>
     <string name="dof_all_models_label">All Models</string>
     <string name="dof_close_btn">close</string>
@@ -144,14 +144,14 @@
     <string name="motor_f4">F4 Ring</string>
     <string name="motor_f5">F5 Little</string>
     <string name="motor_f6">F6 Thumb Abd.</string>
-    <string name="motor_f7">F7 Wrist</string>
+    <string name="motor_f7">F7 Index Abd.</string>
     <string name="motor_short_f1">Thumb</string>
     <string name="motor_short_f2">Index</string>
     <string name="motor_short_f3">Middle</string>
     <string name="motor_short_f4">Ring</string>
     <string name="motor_short_f5">Little</string>
     <string name="motor_short_f6">Thumb Abd.</string>
-    <string name="motor_short_f7">Wrist</string>
+    <string name="motor_short_f7">Index Abd.</string>
     <string name="perm_ble_desc">Nearby devices (Bluetooth) permission is required to scan and control the hand.</string>
     <string name="perm_ble_grant">Grant Permission</string>
     <string name="perm_ble_settings">Open Settings</string>
