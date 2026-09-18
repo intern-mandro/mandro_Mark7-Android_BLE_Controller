@@ -21,10 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
@@ -177,45 +175,38 @@ private fun ModeFlowContent(
     Column(
         Modifier
             .fillMaxSize()
-            .background(Mark7Palette.Bg),
+            .background(Mark7Palette.Bg)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Column(
-            Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            // ─── 모드 1 (상단) ───
-            ModeHeader(
-                title = stringResource(R.string.mode_1_title),
-            )
-            FlowDiagram(
-                graph = ModeFlowGraph.MODE_1,
-                mapping = mapping,
-                onPickGesture = onPickGesture,
-            )
+        // ─── 모드 1 (상단) ───
+        ModeHeader(
+            title = stringResource(R.string.mode_1_title),
+        )
+        FlowDiagram(
+            graph = ModeFlowGraph.MODE_1,
+            mapping = mapping,
+            onPickGesture = onPickGesture,
+        )
 
-            ModeSwitchIndicator()
+        ModeSwitchIndicator()
 
-            // ─── 모드 2 (하단, 같은 형태) ───
-            ModeHeader(
-                title = stringResource(R.string.mode_2_title),
-            )
-            FlowDiagram(
-                graph = ModeFlowGraph.MODE_2,
-                mapping = mapping,
-                onPickGesture = onPickGesture,
-            )
+        // ─── 모드 2 (하단, 같은 형태) ───
+        ModeHeader(
+            title = stringResource(R.string.mode_2_title),
+        )
+        FlowDiagram(
+            graph = ModeFlowGraph.MODE_2,
+            mapping = mapping,
+            onPickGesture = onPickGesture,
+        )
 
-            Spacer(Modifier.height(8.dp))
-        }
+        Spacer(Modifier.height(6.dp))
 
-        // [All Clear] [의수에 적용] — 다른 탭의 [기본값][적용] 버튼 줄과 동일 스타일 (화면 하단 고정)
+        // [All Clear] [의수에 적용] — 모드 2 박스에 바짝 붙여 배치. 다이어그램을 줄인 만큼
+        // 여유가 생겨 다른 탭 버튼과 같은 크기(36dp)로 되돌린다.
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -253,6 +244,8 @@ private fun ModeFlowContent(
                 )
             }
         }
+
+        Spacer(Modifier.height(4.dp))
     }
 }
 
@@ -263,12 +256,12 @@ private fun ModeHeader(
     Row(
         Modifier
             .fillMaxWidth()
-            .height(28.dp),
+            .height(22.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             color = Mark7Palette.Ink,
         )
@@ -373,8 +366,9 @@ private fun FlowDiagram(
         ) {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val totalW = maxWidth
-                // 좁은 폰(~340dp 미만)에서만 노드·간격을 비례 축소해 잘림 방지. 그 이상은 1.0 (기존 그대로).
-                val nodeScale = (totalW / 360.dp).coerceIn(0.78f, 1f)
+                // 좁은 폰(~340dp 미만)에서만 노드·간격을 비례 축소해 잘림 방지. 최대치도 0.9 로 낮춰
+                // 다이어그램 박스 전체를 예전보다 살짝 작게 표시한다.
+                val nodeScale = (totalW / 360.dp).coerceIn(0.78f, 0.9f)
 
                 val nodeRadius = 36.dp * nodeScale
                 val colWidth = 86.dp * nodeScale
