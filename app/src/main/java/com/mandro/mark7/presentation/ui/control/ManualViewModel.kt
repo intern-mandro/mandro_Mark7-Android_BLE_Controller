@@ -105,16 +105,22 @@ class ManualViewModel @Inject constructor(
 
     /**
      * 하단 탭을 다시 눌러(또는 페이저에서 화면이 재구성돼) Manual 화면이 새로 들어올 때 호출.
-     * 손가락 선택·프리셋 준비·세부 조절 임시값을 모두 처음 상태로 되돌린다 → 다른 탭과 동일하게
+     * 손가락 선택·프리셋 준비 상태는 처음 상태로 되돌린다 → 다른 탭과 동일하게
      * "탭을 다시 누르면 초기 화면"으로 보인다. (저장되는 프리셋 목록은 repo 소유라 영향 없음.)
+     *
+     * [speedRaw]/[currentMa](세부 조절 "적용"으로 확정한 값)는 여기서 건드리지 않는다 — 탭을
+     * 잠깐 벗어났다 돌아온다고 Apply 로 확정해 둔 전류·속도가 기본값으로 되돌아가면 안 된다.
      */
     fun resetTransientState() {
         cancelPulse()
         val dof = repo.activeDof.value
+        val current = _uiState.value
         _uiState.value = ManualUiState(
             dof = dof,
             select = List(dof.dof) { false },
             posDeg = List(dof.dof) { 0 },
+            speedRaw = current.speedRaw,
+            currentMa = current.currentMa,
         )
     }
 

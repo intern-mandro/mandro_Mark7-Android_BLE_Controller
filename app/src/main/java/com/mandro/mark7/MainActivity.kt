@@ -84,6 +84,7 @@ import com.mandro.mark7.presentation.navigation.Screen
 import kotlinx.coroutines.launch
 import com.mandro.mark7.presentation.theme.Mark7Palette
 import com.mandro.mark7.presentation.theme.Mark7Theme
+import com.mandro.mark7.presentation.ui.action.ActionViewModel
 import com.mandro.mark7.presentation.ui.action.GesturePickerScreen
 import com.mandro.mark7.presentation.ui.action.ModeFlowScreen
 import com.mandro.mark7.presentation.ui.control.ManualScreen
@@ -129,6 +130,7 @@ class MainActivity : ComponentActivity() {
                 val mainViewModel: MainViewModel = hiltViewModel()
                 val bleState by mainViewModel.bleState.collectAsStateWithLifecycle()
                 val dofMismatch by mainViewModel.dofMismatch.collectAsStateWithLifecycle()
+                val actionViewModel: ActionViewModel = hiltViewModel()
 
                 val scope = rememberCoroutineScope()
                 val pagerState = rememberPagerState(pageCount = { MAIN_TAB_COUNT })
@@ -139,6 +141,31 @@ class MainActivity : ComponentActivity() {
                 val isMain = currentRoute == Screen.Main.route
                 val isPicker = currentRoute == Screen.GesturePicker.route
                 val showChrome = isMain
+
+                // Mode 탭(페이저 1페이지) 또는 그 하위 손모양 피커에 있는 동안은 "Mode 탭 활성"으로 본다
+                // (바텀바에서 Mode 탭을 하이라이트하는 조건과 동일). 이 상태가 true → false 로 바뀌는
+                // 순간(= 다른 하단 탭으로 전환) Send 안 보낸 로컬 선택을 마지막 전송값으로 되돌린다.
+                val modeTabActive = (isMain && pagerState.currentPage == PAGE_MODE) || isPicker
+                var wasModeTabActive by remember { mutableStateOf(modeTabActive) }
+                LaunchedEffect(modeTabActive) {
+                    if (wasModeTabActive && !modeTabActive) {
+                        actionViewModel.revertUnsentChanges()
+                    }
+                    wasModeTabActive = modeTabActive
+                }
+
+                // Control(Manual) 탭도 마찬가지 — 스와이프로 페이지가 바뀌기만 해서는 resetKeys 가
+                // 안 올라가(같은 탭 "재탭"일 때만 올라감), 그러면 Apply 안 누른 전류/속도 임시값이
+                // Pager 에 그대로 남아 있다가 탭을 다시 열면 되돌아오지 않는 문제가 있었다. 탭을
+                // 나가는 순간을 직접 감지해 resetKeys 를 올려 다음 진입 때 처음 상태로 재구성한다.
+                val manualTabActive = isMain && pagerState.currentPage == PAGE_MANUAL
+                var wasManualTabActive by remember { mutableStateOf(manualTabActive) }
+                LaunchedEffect(manualTabActive) {
+                    if (wasManualTabActive && !manualTabActive) {
+                        resetKeys[PAGE_MANUAL] = resetKeys[PAGE_MANUAL] + 1
+                    }
+                    wasManualTabActive = manualTabActive
+                }
                 val pickerStateId = backStackEntry?.arguments?.getString("state")?.toIntOrNull() ?: 0
                 val onPickerBack: (String?) -> Unit = { notice ->
                     if (notice != null) {
@@ -401,6 +428,7 @@ class MainActivity : ComponentActivity() {
                                             onConsumeNotice = {
                                                 backStackEntry?.savedStateHandle?.remove<String>("picker_notice")
                                             },
+                                            viewModel = actionViewModel,
                                         )
                                     }
                                     PAGE_MANUAL -> key(resetKeys[PAGE_MANUAL]) { ManualScreen() }

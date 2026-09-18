@@ -77,6 +77,19 @@ class ActionViewModel @Inject constructor(
         pushAndReport()
     }
 
+    /**
+     * Mode 탭을 떠날 때(다른 하단 탭으로 전환) 호출. Send 로 보내지 않은 채 로컬에만
+     * 커밋된 손 모양 선택이 있으면, 마지막으로 실제 전송된 매핑([syncedMapping])으로 되돌린다.
+     */
+    fun revertUnsentChanges() {
+        val state = _uiState.value
+        if (state.hasUnsentChanges) {
+            viewModelScope.launch(kotlinx.coroutines.NonCancellable) {
+                repo.updateActionMapping(state.syncedMapping)
+            }
+        }
+    }
+
     private suspend fun pushAndReport() {
         val result = repo.pushConfig()
         _uiState.update { it.copy(pushing = false) }
