@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.setContent
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -234,6 +235,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             } else {
                                 ConnectionHeader(
+                                    tabLabelRes = BOTTOM_NAV_ITEMS[pagerState.currentPage].labelRes,
                                     onScanClick = {
                                         hasBeenConnected = false
                                         mainViewModel.disconnectAndRescan()
@@ -518,6 +520,7 @@ private fun ConnectionIconButton(
 
 @Composable
 private fun ConnectionHeader(
+    @StringRes tabLabelRes: Int,
     onScanClick: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
@@ -535,7 +538,11 @@ private fun ConnectionHeader(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text = stringResource(R.string.app_name),
+                        text = stringResource(
+                            R.string.header_title_format,
+                            stringResource(R.string.app_name),
+                            stringResource(tabLabelRes),
+                        ),
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         color = Mark7Palette.Ink,
