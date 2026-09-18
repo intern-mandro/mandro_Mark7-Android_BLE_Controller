@@ -1,4 +1,4 @@
-package com.mandro.mark7.presentation.ui.manual
+package com.mandro.mark7.presentation.ui.control
 
 import com.mandro.mark7.domain.model.hand.HandConfig
 import com.mandro.mark7.domain.model.hand.ManualPreset

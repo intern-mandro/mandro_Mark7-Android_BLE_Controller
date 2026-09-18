@@ -85,7 +85,7 @@ import com.mandro.mark7.presentation.theme.Mark7Palette
 import com.mandro.mark7.presentation.theme.Mark7Theme
 import com.mandro.mark7.presentation.ui.action.GesturePickerScreen
 import com.mandro.mark7.presentation.ui.action.ModeFlowScreen
-import com.mandro.mark7.presentation.ui.manual.ManualScreen
+import com.mandro.mark7.presentation.ui.control.ManualScreen
 import com.mandro.mark7.presentation.ui.monitor.MonitorScreen
 import com.mandro.mark7.presentation.ui.scan.ScanScreen
 import com.mandro.mark7.presentation.ui.settings.SettingsScreen

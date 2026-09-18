@@ -1,4 +1,4 @@
-package com.mandro.mark7.presentation.ui.manual
+package com.mandro.mark7.presentation.ui.control
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween

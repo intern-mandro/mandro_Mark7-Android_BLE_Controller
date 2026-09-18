@@ -1,4 +1,4 @@
-package com.mandro.mark7.presentation.ui.manual
+package com.mandro.mark7.presentation.ui.control
 
 import android.content.Context
 import android.net.Uri
